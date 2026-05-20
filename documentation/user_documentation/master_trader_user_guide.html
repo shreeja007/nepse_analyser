@@ -1,0 +1,2114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Master Trader Report — User Guide</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0b0e14;
+        --surface: #131720;
+        --surface2: #1a2030;
+        --border: #1f2b3e;
+        --gold: #c9a84c;
+        --gold-light: #e4c97e;
+        --gold-dim: rgba(201, 168, 76, 0.12);
+        --teal: #3ecfcf;
+        --red: #e05c5c;
+        --green: #4fcb8d;
+        --text: #d8dde8;
+        --text-dim: #7a869a;
+        --text-bright: #eef1f7;
+        --mono: "JetBrains Mono", monospace;
+        --serif: "Playfair Display", serif;
+        --sans: "DM Sans", sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      /* ── Accessibility: skip link + focus states ── */
+      .skip-link {
+        position: fixed;
+        top: 14px;
+        left: 14px;
+        z-index: 300;
+        padding: 10px 12px;
+        border-radius: 6px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text-bright);
+        text-decoration: none;
+        font-family: var(--mono);
+        font-size: 12px;
+        transform: translateY(-140%);
+        transition: transform 0.2s ease;
+      }
+
+      .skip-link:focus {
+        transform: translateY(0);
+      }
+
+      .nav-link:focus-visible,
+      .mobile-toggle:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.75;
+        min-height: 100vh;
+      }
+
+      /* ── Audience toggle ── */
+      body[data-audience="beginner"] .audience-intermediate {
+        display: none !important;
+      }
+      body[data-audience="intermediate"] .audience-beginner {
+        display: none !important;
+      }
+
+      .audience-toggle {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-top: 14px;
+      }
+
+      .audience-btn {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--surface2);
+        color: var(--text-dim);
+        cursor: pointer;
+        transition: all 0.18s;
+      }
+
+      .audience-btn[aria-selected="true"] {
+        color: var(--text-bright);
+        border-color: rgba(201, 168, 76, 0.35);
+        background: rgba(201, 168, 76, 0.08);
+      }
+
+      .audience-btn:hover {
+        color: var(--text-bright);
+        border-color: rgba(201, 168, 76, 0.25);
+      }
+
+      /* ── Noise texture overlay ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── Sidebar nav ── */
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px;
+        height: 100vh;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 32px 0;
+        z-index: 100;
+        overflow-y: auto;
+      }
+
+      .sidebar-logo {
+        padding: 0 28px 28px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 20px;
+      }
+
+      .sidebar-logo .label {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 6px;
+      }
+
+      .sidebar-logo h1 {
+        font-family: var(--serif);
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-bright);
+        line-height: 1.2;
+      }
+
+      .nav-section-label {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        padding: 12px 28px 6px;
+      }
+
+      .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 28px;
+        color: var(--text-dim);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 400;
+        transition: all 0.18s;
+        border-left: 2px solid transparent;
+      }
+
+      .nav-link:hover,
+      .nav-link.active {
+        color: var(--text-bright);
+        background: var(--gold-dim);
+        border-left-color: var(--gold);
+      }
+
+      .nav-link .icon {
+        width: 16px;
+        text-align: center;
+        font-size: 12px;
+        opacity: 0.7;
+      }
+
+      /* ── Main content ── */
+      .main {
+        margin-left: 260px;
+        padding: 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── Hero banner ── */
+      .hero {
+        background: linear-gradient(
+          135deg,
+          #0f1420 0%,
+          #0b1628 50%,
+          #0f1a1a 100%
+        );
+        border-bottom: 1px solid var(--border);
+        padding: 72px 64px 56px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        top: -80px;
+        right: -80px;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(
+          circle,
+          rgba(201, 168, 76, 0.06) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      .hero-eyebrow {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 16px;
+      }
+
+      .hero h1 {
+        font-family: var(--serif);
+        font-size: clamp(28px, 3vw, 42px);
+        font-weight: 700;
+        color: var(--text-bright);
+        line-height: 1.15;
+        max-width: 560px;
+        margin-bottom: 16px;
+      }
+
+      .hero p {
+        color: var(--text-dim);
+        font-size: 15px;
+        max-width: 500px;
+        line-height: 1.7;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--border);
+        margin-top: 40px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+        max-width: 620px;
+      }
+
+      .hero-stat {
+        background: var(--surface);
+        padding: 16px 20px;
+        text-align: center;
+      }
+
+      .hero-stat .val {
+        font-family: var(--mono);
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--gold-light);
+        display: block;
+      }
+
+      .hero-stat .lbl {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-top: 2px;
+        display: block;
+      }
+
+      /* ── Content area ── */
+      .content {
+        padding: 56px 64px;
+        max-width: 900px;
+      }
+
+      /* ── Section titles ── */
+      .section {
+        margin-bottom: 64px;
+        opacity: 0;
+        transform: translateY(16px);
+        transition:
+          opacity 0.4s ease,
+          transform 0.4s ease;
+      }
+
+      .section.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section-num {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 0.15em;
+        color: var(--gold);
+        background: var(--gold-dim);
+        border: 1px solid rgba(201, 168, 76, 0.25);
+        border-radius: 3px;
+        padding: 3px 8px;
+        flex-shrink: 0;
+      }
+
+      .section h2 {
+        font-family: var(--serif);
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--text-bright);
+      }
+
+      .section p {
+        color: var(--text);
+        margin-bottom: 14px;
+      }
+
+      /* ── Cards ── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 24px 28px;
+        margin-bottom: 16px;
+      }
+
+      .card-title {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 12px;
+      }
+
+      /* ── How-to-use block ── */
+      .how-to {
+        background: rgba(201, 168, 76, 0.05);
+        border: 1px solid rgba(201, 168, 76, 0.2);
+        border-radius: 6px;
+        padding: 20px 24px;
+        margin-top: 16px;
+      }
+
+      .how-to .ht-title {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .how-to .ht-title::before {
+        content: "▶";
+        font-size: 7px;
+      }
+
+      .how-to ol,
+      .how-to ul {
+        padding-left: 18px;
+        color: var(--text);
+      }
+
+      .how-to li {
+        margin-bottom: 6px;
+      }
+
+      /* ── Tags / chips ── */
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+
+      .tag {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 3px 10px;
+        border-radius: 3px;
+        border: 1px solid;
+      }
+
+      .tag-gold {
+        color: var(--gold-light);
+        border-color: rgba(201, 168, 76, 0.35);
+        background: rgba(201, 168, 76, 0.08);
+      }
+      .tag-teal {
+        color: var(--teal);
+        border-color: rgba(62, 207, 207, 0.3);
+        background: rgba(62, 207, 207, 0.07);
+      }
+      .tag-red {
+        color: var(--red);
+        border-color: rgba(224, 92, 92, 0.3);
+        background: rgba(224, 92, 92, 0.07);
+      }
+      .tag-green {
+        color: var(--green);
+        border-color: rgba(79, 203, 141, 0.3);
+        background: rgba(79, 203, 141, 0.07);
+      }
+      .tag-dim {
+        color: var(--text-dim);
+        border-color: var(--border);
+        background: var(--surface2);
+      }
+
+      /* ── Field list ── */
+      .field-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 14px 0;
+      }
+
+      .field-row {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 16px;
+        align-items: start;
+        padding: 10px 16px;
+        background: var(--surface2);
+        border-radius: 4px;
+        border-left: 2px solid var(--border);
+      }
+
+      .field-row:hover {
+        border-left-color: var(--gold);
+      }
+
+      .field-name {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--gold-light);
+      }
+
+      .field-desc {
+        font-size: 13px;
+        color: var(--text);
+      }
+
+      /* ── Badge meanings table ── */
+      .badge-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0;
+      }
+
+      .badge-table th {
+        font-family: var(--mono);
+        font-size: 9px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        padding: 10px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .badge-table td {
+        padding: 10px 16px;
+        font-size: 13px;
+        border-bottom: 1px solid rgba(31, 43, 62, 0.6);
+        vertical-align: top;
+      }
+
+      .badge-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* ── Workflow steps ── */
+      .workflow {
+        counter-reset: step;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+
+      .workflow-step {
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        gap: 0;
+        position: relative;
+      }
+
+      .workflow-step:not(:last-child) .step-line {
+        position: absolute;
+        left: 23px;
+        top: 48px;
+        bottom: 0;
+        width: 2px;
+        background: var(--border);
+      }
+
+      .step-num {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--surface2);
+        border: 2px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--gold);
+        flex-shrink: 0;
+        margin-top: 4px;
+        z-index: 1;
+        transition: all 0.2s;
+      }
+
+      .workflow-step:hover .step-num {
+        border-color: var(--gold);
+        background: var(--gold-dim);
+      }
+
+      .step-body {
+        padding: 6px 0 32px 20px;
+      }
+
+      .step-body strong {
+        display: block;
+        color: var(--text-bright);
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+
+      .step-body p {
+        font-size: 13px;
+        color: var(--text-dim);
+        margin: 0;
+      }
+
+      /* ── Risk rules ── */
+      .risk-rules {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .risk-rule {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        background: rgba(224, 92, 92, 0.05);
+        border: 1px solid rgba(224, 92, 92, 0.18);
+        border-radius: 5px;
+        padding: 14px 18px;
+      }
+
+      .risk-icon {
+        color: var(--red);
+        font-size: 13px;
+        margin-top: 1px;
+        flex-shrink: 0;
+      }
+
+      .risk-rule span {
+        font-size: 14px;
+        color: var(--text);
+      }
+
+      /* ── Intro checklist ── */
+      .checklist {
+        list-style: none;
+      }
+
+      .checklist li {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+        color: var(--text);
+        font-size: 14px;
+      }
+
+      .checklist li:last-child {
+        border-bottom: none;
+      }
+
+      .check-badge {
+        font-family: var(--mono);
+        font-size: 10px;
+        color: var(--gold);
+        background: var(--gold-dim);
+        border: 1px solid rgba(201, 168, 76, 0.2);
+        border-radius: 2px;
+        padding: 1px 6px;
+        flex-shrink: 0;
+      }
+
+      /* ── Alert / note box ── */
+      .alert {
+        display: flex;
+        gap: 16px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--gold);
+        border-radius: 4px;
+        padding: 18px 22px;
+        margin-top: 16px;
+      }
+
+      .alert-icon {
+        font-size: 18px;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+
+      .alert-body {
+        font-size: 14px;
+        color: var(--text);
+        line-height: 1.65;
+      }
+
+      .alert-body strong {
+        color: var(--text-bright);
+      }
+
+      /* ── KPI grid ── */
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 10px;
+        margin: 14px 0;
+      }
+
+      .kpi-item {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 12px 14px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--teal);
+        transition: border-color 0.2s;
+      }
+
+      .kpi-item:hover {
+        border-color: var(--teal);
+      }
+
+      /* ── DB table list ── */
+      .db-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+
+      .db-tag {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 3px;
+        color: var(--text-dim);
+        background: var(--surface2);
+        border: 1px solid var(--border);
+      }
+
+      /* ── Mobile menu toggle ── */
+      .mobile-toggle {
+        display: none;
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 200;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 10px 14px;
+        cursor: pointer;
+        color: var(--gold);
+        font-size: 16px;
+      }
+
+      .divider {
+        border: none;
+        border-top: 1px solid var(--border);
+        margin: 40px 0;
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 900px) {
+        .sidebar {
+          transform: translateX(-100%);
+          transition: transform 0.25s;
+        }
+        .sidebar.open {
+          transform: translateX(0);
+        }
+        .main {
+          margin-left: 0;
+        }
+        .mobile-toggle {
+          display: flex;
+        }
+        .hero {
+          padding: 56px 28px 40px;
+        }
+        .content {
+          padding: 36px 28px;
+        }
+        .hero-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .field-row {
+          grid-template-columns: 1fr;
+        }
+        .workflow-step {
+          grid-template-columns: 40px 1fr;
+        }
+      }
+
+      /* ── Reduced motion ── */
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        .section {
+          transition: none;
+          transform: none;
+          opacity: 1;
+        }
+        .skip-link {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body data-audience="beginner">
+    <!-- Skip link (keyboard users) -->
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <!-- Mobile toggle -->
+    <button
+      class="mobile-toggle"
+      id="menuBtn"
+      aria-label="Open menu"
+      aria-controls="sidebar"
+      aria-expanded="false"
+    >
+      ☰
+    </button>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="label">User Guide</div>
+        <h1>Master Trader<br />Report</h1>
+
+        <!-- Audience mode toggle -->
+        <div class="audience-toggle" role="tablist" aria-label="Guide mode">
+          <button
+            class="audience-btn"
+            id="audBeginner"
+            role="tab"
+            aria-selected="true"
+            aria-controls="main-content"
+            type="button"
+          >
+            Beginner
+          </button>
+          <button
+            class="audience-btn"
+            id="audIntermediate"
+            role="tab"
+            aria-selected="false"
+            aria-controls="main-content"
+            type="button"
+          >
+            Intermediate
+          </button>
+        </div>
+      </div>
+
+      <div class="nav-section-label">Getting Started</div>
+      <a class="nav-link" href="#purpose"
+        ><span class="icon">◈</span> What This Report Is</a
+      >
+      <a class="nav-link" href="#before"
+        ><span class="icon">◎</span> Before You Trade</a
+      >
+
+      <div class="nav-section-label">Report Sections</div>
+      <a class="nav-link" href="#header"
+        ><span class="icon">①</span> Header Banner</a
+      >
+      <a class="nav-link" href="#data-sources"
+        ><span class="icon">②</span> Data Sources</a
+      >
+      <a class="nav-link" href="#market-dashboard"
+        ><span class="icon">③</span> Market Dashboard</a
+      >
+      <a class="nav-link" href="#hotlist"
+        ><span class="icon">④</span> Hotlist</a
+      >
+      <a class="nav-link" href="#broker-flow"
+        ><span class="icon">⑤</span> Broker Flow</a
+      >
+      <a class="nav-link" href="#trade-plans"
+        ><span class="icon">⑥</span> Trade Plans</a
+      >
+      <a class="nav-link" href="#why-stocks"
+        ><span class="icon">⑦</span> Why These Stocks</a
+      >
+      <a class="nav-link" href="#universe"
+        ><span class="icon">⑧</span> Full Universe</a
+      >
+      <a class="nav-link" href="#modal"
+        ><span class="icon">⑨</span> Ranking Modal</a
+      >
+      <a class="nav-link" href="#exit-tracker"
+        ><span class="icon">⑩</span> Exit Tracker</a
+      >
+
+      <div class="nav-section-label">Reference</div>
+      <a class="nav-link" href="#badges"
+        ><span class="icon">◆</span> Badge Meanings</a
+      >
+      <a class="nav-link" href="#workflow"
+        ><span class="icon">◉</span> Daily Workflow</a
+      >
+      <a class="nav-link" href="#risk"
+        ><span class="icon">⚠</span> Risk Rules</a
+      >
+    </nav>
+
+    <!-- Main content -->
+    <main class="main">
+      <!-- Hero -->
+      <div class="hero" id="purpose">
+        <div class="hero-eyebrow">Master Trader · Documentation</div>
+        <h1>Report User Guide</h1>
+        <p class="audience-beginner">
+          Understand every section of the HTML trading report and make cleaner,
+          rule-based decisions. This guide is written for traders — not
+          developers.
+        </p>
+        <p class="audience-intermediate">
+          Use this page as a fast reference: data quality → regime → hotlist →
+          plans → tracker.
+        </p>
+
+        <div class="hero-grid">
+          <div class="hero-stat">
+            <span class="val">10</span><span class="lbl">Sections</span>
+          </div>
+          <div class="hero-stat">
+            <span class="val">3</span><span class="lbl">Plan Buckets</span>
+          </div>
+          <div class="hero-stat">
+            <span class="val">≤5</span><span class="lbl">Hotlist Picks</span>
+          </div>
+          <div class="hero-stat">
+            <span class="val">Daily</span><span class="lbl">Cadence</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="content" id="main-content">
+        <!-- What this report is -->
+        <section class="section" id="purpose-detail">
+          <div class="section-header">
+            <span class="section-num">INTRO</span>
+            <h2>What This Report Is</h2>
+          </div>
+          <p class="audience-beginner">
+            The Master Trader report is a
+            <strong style="color: var(--text-bright)"
+              >full trading dashboard in one HTML page.</strong
+            >
+            It does five things:
+          </p>
+          <p class="audience-intermediate">
+            One-page dashboard that outputs: (1) market context, (2) top picks,
+            (3) ready plans, (4) risk/data checks, (5) hold/trim/exit for
+            tracked symbols.
+          </p>
+          <div class="field-list">
+            <div class="field-row">
+              <span class="field-name">① Market condition</span
+              ><span class="field-desc"
+                >Evaluates the current regime before you look at individual
+                stocks.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">② Top opportunities</span
+              ><span class="field-desc"
+                >Surfaces the highest-conviction picks from the full
+                universe.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">③ Ready trade plans</span
+              ><span class="field-desc"
+                >Entry zone, stop loss, targets, and hold period — all
+                pre-calculated.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">④ Risk & confidence</span
+              ><span class="field-desc"
+                >Data quality, execution confidence, and veto warnings for every
+                setup.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">⑤ Open-trade signals</span
+              ><span class="field-desc"
+                >Hold / Trim / Exit guidance for positions you already
+                hold.</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <!-- Before you trade -->
+        <section class="section" id="before">
+          <div class="section-header">
+            <span class="section-num">CHECKLIST</span>
+            <h2>Before You Trade</h2>
+          </div>
+          <p class="audience-beginner">
+            Always scan these sections in order — top to bottom — before taking
+            any action.
+          </p>
+          <p class="audience-intermediate">
+            Fast flow: Data quality → Regime → Hotlist → Plans → (View) →
+            Tracker.
+          </p>
+          <ul class="checklist">
+            <li>
+              <span class="check-badge">01</span> Data Sources And Accuracy
+            </li>
+            <li><span class="check-badge">02</span> Market Dashboard</li>
+            <li><span class="check-badge">03</span> Hotlist</li>
+            <li>
+              <span class="check-badge">04</span> Bucket Plans (Short / Swing /
+              Long)
+            </li>
+            <li>
+              <span class="check-badge">05</span> Full Universe Ranking — use
+              View Details
+            </li>
+            <li>
+              <span class="check-badge">06</span> Exit Signal Tracker —
+              <em>only if you hold open positions</em>
+            </li>
+          </ul>
+        </section>
+
+        <hr class="divider" />
+
+        <!-- Section 1: Header -->
+        <section class="section" id="header">
+          <div class="section-header">
+            <span class="section-num">SECTION 01</span>
+            <h2>Header — Top Banner</h2>
+          </div>
+          <p class="audience-beginner">
+            The banner at the very top gives you a quick pulse-check on the
+            report itself.
+          </p>
+          <p class="audience-intermediate">
+            Trust nothing until the banner shows fresh data and a healthy
+            universe size.
+          </p>
+          <div class="field-list">
+            <div class="field-row">
+              <span class="field-name">Generated</span
+              ><span class="field-desc"
+                >Exact time the report was built. Older reports mean less fresh
+                data.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Mode</span
+              ><span class="field-desc"
+                ><code style="color: var(--green)">TRADING</code> or
+                <code style="color: var(--gold)">SCREENING</code>. Trading mode
+                includes position sizing.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Universe</span
+              ><span class="field-desc"
+                >Total number of symbols evaluated in this run.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Short / Swing / Long / Hotlist</span
+              ><span class="field-desc"
+                >Count of picks in each category. Very low hotlist count → be
+                selective and reduce position size.</span
+              >
+            </div>
+          </div>
+          <div class="how-to">
+            <div class="ht-title">How to use</div>
+            <ul>
+              <li>
+                If the <em>Generated</em> time is old, avoid aggressive entries.
+              </li>
+              <li>
+                If Hotlist count is very low, be selective and reduce position
+                size.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Section 2: Data Sources -->
+        <section class="section" id="data-sources">
+          <div class="section-header">
+            <span class="section-num">SECTION 02</span>
+            <h2>Data Sources & Accuracy</h2>
+          </div>
+          <p class="audience-beginner">
+            This is your
+            <strong style="color: var(--text-bright)"
+              >quality checkpoint</strong
+            >
+            — read it before trusting any signal.
+          </p>
+          <p class="audience-intermediate">
+            Quality gate: if freshness is stale or accuracy weak, size down or
+            skip marginal setups.
+          </p>
+
+          <div class="card">
+            <div class="card-title">Key Metrics</div>
+            <div class="kpi-grid">
+              <div class="kpi-item">Accuracy Score</div>
+              <div class="kpi-item">Data Freshness</div>
+              <div class="kpi-item">Equity Zero Volume</div>
+              <div class="kpi-item">Missing vs daily_prices</div>
+              <div class="kpi-item">Bad Close Rows</div>
+              <div class="kpi-item">Processed Symbols</div>
+              <div class="kpi-item">Avg Execution Confidence</div>
+              <div class="kpi-item">A/B Data Grade Share</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Database Tables Used</div>
+            <div class="db-list">
+              <span class="db-tag">daily_ohlcv</span>
+              <span class="db-tag">daily_prices</span>
+              <span class="db-tag">live_market_snapshots</span>
+              <span class="db-tag">floorsheet_transactions</span>
+              <span class="db-tag">market_summary</span>
+              <span class="db-tag">nepse_sub_indices</span>
+              <span class="db-tag">scrip_rankings</span>
+              <span class="db-tag">company_details</span>
+              <span class="db-tag">company_fundamentals</span>
+              <span class="db-tag">securities</span>
+            </div>
+          </div>
+
+          <div class="how-to">
+            <div class="ht-title">How to use</div>
+            <ol>
+              <li>
+                If <strong>Data Freshness</strong> is
+                <code style="color: var(--red)">STALE</code> → reduce risk or
+                wait for a fresh report.
+              </li>
+              <li>
+                If <strong>Accuracy Score</strong> is weak → avoid marginal
+                setups.
+              </li>
+              <li>
+                If <strong>Equity Zero Volume</strong> or
+                <strong>Missing vs daily_prices</strong> is high → trust only
+                the strongest signals.
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- Section 3: Market Dashboard -->
+        <section class="section" id="market-dashboard">
+          <div class="section-header">
+            <span class="section-num">SECTION 03</span>
+            <h2>Market Dashboard</h2>
+          </div>
+          <p class="audience-beginner">
+            This gives you
+            <strong style="color: var(--text-bright)"
+              >broad market context</strong
+            >
+            before you look at individual stocks.
+          </p>
+          <p class="audience-intermediate">
+            Regime + breadth decide aggression: bullish → normal risk, weak
+            breadth → only A+ setups.
+          </p>
+          <div class="field-list">
+            <div class="field-row">
+              <span class="field-name">Regime</span
+              ><span class="field-desc"
+                >Overall market condition — bullish, bearish, or neutral.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Turnover</span
+              ><span class="field-desc"
+                >Total market trading volume in the session.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Adv / Dec</span
+              ><span class="field-desc"
+                >Advancing vs declining stocks — a breadth indicator.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Transactions</span
+              ><span class="field-desc"
+                >Total number of executed transactions.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Sector sub-index table</span
+              ><span class="field-desc"
+                >Value and percentage change for each sector sub-index.</span
+              >
+            </div>
+          </div>
+          <div class="how-to">
+            <div class="ht-title">How to use</div>
+            <ul>
+              <li>Favor longs when regime and breadth are healthy.</li>
+              <li>Be careful with aggressive buys when breadth is weak.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Section 4: Hotlist -->
+        <section class="section" id="hotlist">
+          <div class="section-header">
+            <span class="section-num">SECTION 04</span>
+            <h2>
+              Hotlist
+              <span
+                style="
+                  font-size: 14px;
+                  color: var(--text-dim);
+                  font-family: var(--sans);
+                "
+                >(max 5 picks)</span
+              >
+            </h2>
+          </div>
+          <p class="audience-beginner">
+            The Hotlist is the
+            <strong style="color: var(--text-bright)"
+              >highest-conviction shortlist</strong
+            >
+            in the entire report. Start here.
+          </p>
+          <p class="audience-intermediate">
+            Trade focus list: start here; prefer BUY + higher fused score +
+            better data grade; respect warnings.
+          </p>
+
+          <div class="card">
+            <div class="card-title">Each Hotlist Card Shows</div>
+            <div class="field-list" style="margin: 0">
+              <div class="field-row">
+                <span class="field-name">Symbol & Company</span
+                ><span class="field-desc"
+                  >The stock identifier and full company name.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Score & Action</span
+                ><span class="field-desc"
+                  >The composite score alongside a
+                  <span class="tag tag-green" style="display: inline">BUY</span>
+                  /
+                  <span class="tag tag-gold" style="display: inline"
+                    >WATCH</span
+                  >
+                  /
+                  <span class="tag tag-red" style="display: inline">AVOID</span>
+                  badge.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Fused Score</span
+                ><span class="field-desc"
+                  >Blended score combining multiple signal components.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Priority Tier</span
+                ><span class="field-desc"
+                  >How high this stock ranks relative to all others.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Execution Confidence</span
+                ><span class="field-desc"
+                  >How reliable the execution signals are.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Data Grade</span
+                ><span class="field-desc"
+                  >Quality of underlying data (A/B graded).</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Broker State & Signal Bias</span
+                ><span class="field-desc"
+                  >Whether broker flow supports the directional bias.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Active Timeframes</span
+                ><span class="field-desc"
+                  >Which plan buckets this stock qualifies for: short / swing /
+                  long.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Warnings</span
+                ><span class="field-desc"
+                  >Veto watch alerts, upcoming book closures, or other caution
+                  flags.</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="how-to">
+            <div class="ht-title">How to use</div>
+            <ol>
+              <li>Build your watchlist starting from the Hotlist.</li>
+              <li>
+                Prefer symbols with <strong>BUY</strong>, stronger fused score,
+                and better data quality.
+              </li>
+              <li>Read and respect all warning text before entering.</li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- Section 5: Broker Flow -->
+        <section class="section" id="broker-flow">
+          <div class="section-header">
+            <span class="section-num">SECTION 05</span>
+            <h2>Broker Heavy Buy/Sell Flow</h2>
+          </div>
+          <p class="audience-beginner">
+            Summarizes what professional brokers have been doing across recent
+            sessions.
+          </p>
+          <p class="audience-intermediate">
+            Use as confirmation: accumulation supports longs; distribution
+            vetoes fresh entries.
+          </p>
+
+          <div class="tags">
+            <span class="tag tag-teal">Top Accumulation (Buy Side)</span>
+            <span class="tag tag-red">Top Distribution (Sell Side)</span>
+            <span class="tag tag-dim">Most Active Broker Flow</span>
+          </div>
+
+          <div class="field-list">
+            <div class="field-row">
+              <span class="field-name">Buy / Sell Amount</span
+              ><span class="field-desc"
+                >Total money value traded on each side.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Buy/Sell Ratio</span
+              ><span class="field-desc"
+                >Relative conviction — higher buy ratio = more accumulation
+                pressure.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Signal Badge</span
+              ><span class="field-desc">
+                <span class="tag tag-green">BUY HEAVY</span>&nbsp;
+                <span class="tag tag-red">SELL HEAVY</span>&nbsp;
+                <span class="tag tag-gold">TWO-WAY</span>&nbsp;
+                <span class="tag tag-dim">NO FLOW</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="how-to">
+            <div class="ht-title">How to use</div>
+            <ul>
+              <li>
+                <strong>Strong accumulation</strong> supports continuation
+                entries.
+              </li>
+              <li>
+                <strong>Heavy distribution</strong> is a caution for fresh
+                longs.
+              </li>
+              <li>
+                <strong>TWO-WAY</strong> means mixed conviction — require
+                tighter risk control.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Section 6: Trade Plans -->
+        <section class="section" id="trade-plans">
+          <div class="section-header">
+            <span class="section-num">SECTION 06</span>
+            <h2>Trade Plan Sections</h2>
+          </div>
+          <p class="audience-beginner">
+            Three ready-made plan tables, one per time horizon.
+          </p>
+          <p class="audience-intermediate">
+            Treat plans as executable checklists: entry zone + stop + R:R + exit
+            plan.
+          </p>
+
+          <div class="tags" style="margin-bottom: 16px">
+            <span class="tag tag-teal">Short-Term Plays — 1–5 days</span>
+            <span class="tag tag-gold">Swing Trades — 1–2 months</span>
+            <span class="tag tag-dim">Long-Term Accumulation — 6+ months</span>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Columns in Each Row</div>
+            <div class="field-list" style="margin: 0">
+              <div class="field-row">
+                <span class="field-name">Entry Zone</span
+                ><span class="field-desc"
+                  >The price range where buying is considered valid.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Stop</span
+                ><span class="field-desc"
+                  >Where to exit if the trade moves against you.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">T1 / T2 / T3</span
+                ><span class="field-desc"
+                  >Profit targets in order of distance from entry.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">R:R</span
+                ><span class="field-desc"
+                  >Risk-to-reward ratio. Higher is better.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Broker Flow</span
+                ><span class="field-desc"
+                  >Whether institutional broker activity supports the
+                  setup.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Hold</span
+                ><span class="field-desc">Suggested holding duration.</span>
+              </div>
+              <div class="field-row">
+                <span class="field-name">Why Included</span
+                ><span class="field-desc"
+                  >Plain-language reason this stock is in the plan.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Exit Plan</span
+                ><span class="field-desc"
+                  >When and how to get out — beyond just the stop.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Size</span
+                ><span class="field-desc"
+                  ><em>Trading mode only.</em> Suggested position size.</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="how-to">
+            <div class="ht-title">How to use</div>
+            <ol>
+              <li>
+                Enter <strong>only near the entry zone</strong> — not after a
+                big move away from it.
+              </li>
+              <li>Place your stop <strong>immediately</strong> after entry.</li>
+              <li>
+                Skip setups with weak R:R compared to your personal rules.
+              </li>
+              <li>
+                Read <em>Why Included</em> and <em>Exit Plan</em> before placing
+                any order.
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- Section 7: Why These Stocks -->
+        <section class="section" id="why-stocks">
+          <div class="section-header">
+            <span class="section-num">SECTION 07</span>
+            <h2>Why These Stocks</h2>
+          </div>
+          <p class="audience-beginner">
+            Click the <strong style="color: var(--gold)">View</strong> button
+            inside any plan section to open expanded explainability cards.
+          </p>
+          <p class="audience-intermediate">
+            Use View as a pre-trade checklist: PASS/FAIL rules + veto reasons +
+            broker maturity.
+          </p>
+          <div class="field-list">
+            <div class="field-row">
+              <span class="field-name">Selection Criteria</span
+              ><span class="field-desc"
+                >Each rule marked
+                <span
+                  class="tag tag-green"
+                  style="display: inline; font-size: 10px"
+                  >PASS</span
+                >
+                /
+                <span
+                  class="tag tag-red"
+                  style="display: inline; font-size: 10px"
+                  >FAIL</span
+                >
+                /
+                <span
+                  class="tag tag-dim"
+                  style="display: inline; font-size: 10px"
+                  >INFO</span
+                ></span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Setup Reasoning</span
+              ><span class="field-desc"
+                >What technical and fundamental pattern triggered the
+                inclusion.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Why Buy / Why Sell/Trim</span
+              ><span class="field-desc"
+                >Two-sided argument — supports and risks.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Risk Snapshot</span
+              ><span class="field-desc"
+                >Fused score, execution confidence, data quality, volatility,
+                drawdown, veto reasons.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Broker Flow Details</span
+              ><span class="field-desc"
+                >Top buyers/sellers, intensity, trust, maturity.</span
+              >
+            </div>
+          </div>
+          <div class="alert">
+            <div class="alert-icon">💡</div>
+            <div class="alert-body">
+              <strong>Best practice:</strong> Always open the View card for any
+              setup before committing capital. This is the single most important
+              validation step.
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 8: Full Universe -->
+        <section class="section" id="universe">
+          <div class="section-header">
+            <span class="section-num">SECTION 08</span>
+            <h2>Full Universe Ranking</h2>
+          </div>
+          <p class="audience-beginner">
+            The broad ranked list of
+            <strong style="color: var(--text-bright)">all candidates</strong>
+            considered in this report.
+          </p>
+          <p class="audience-intermediate">
+            Use as screener: sort by fused score/tier; open View for anything
+            you might size up.
+          </p>
+          <div class="kpi-grid">
+            <div class="kpi-item">Score / Fused Score</div>
+            <div class="kpi-item">Priority Tier</div>
+            <div class="kpi-item">Execution Confidence</div>
+            <div class="kpi-item">Data Quality</div>
+            <div class="kpi-item">Broker Alignment</div>
+            <div class="kpi-item">Action</div>
+            <div class="kpi-item">Tier & Setup</div>
+            <div class="kpi-item">Sector Rank / RSI</div>
+            <div class="kpi-item">Turnover Rank</div>
+            <div class="kpi-item">Volume Ratio</div>
+            <div class="kpi-item">Broker Asymmetry</div>
+            <div class="kpi-item">Broker Flow</div>
+          </div>
+          <p style="margin-top: 12px">
+            Click <strong style="color: var(--gold)">View</strong> on any row to
+            open the deep ranking modal for that stock.
+          </p>
+        </section>
+
+        <!-- Section 9: Ranking Modal -->
+        <section class="section" id="modal">
+          <div class="section-header">
+            <span class="section-num">SECTION 09</span>
+            <h2>Ranking Modal — Deep Detail</h2>
+          </div>
+          <p class="audience-beginner">
+            The ranking modal opens when you click
+            <strong style="color: var(--gold)">View</strong> in the full
+            universe table. Use it for larger positions or borderline setups.
+          </p>
+          <p class="audience-intermediate">
+            Decision layer: fused score + safety multiplier + explicit penalties
+            + broker lifecycle + vetoes.
+          </p>
+
+          <div class="card">
+            <div class="card-title">Decision Intelligence Block</div>
+            <div class="field-list" style="margin: 0">
+              <div class="field-row">
+                <span class="field-name">Fused Score</span
+                ><span class="field-desc"
+                  >Combined final score after all adjustments.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Opportunity Score</span
+                ><span class="field-desc"
+                  >Raw potential without safety discounts.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Safety Multiplier</span
+                ><span class="field-desc"
+                  >How much risk adjusts the opportunity score.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Explicit Penalties</span
+                ><span class="field-desc"
+                  >Automatic score deductions applied for specific risk
+                  flags.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Component Contributions</span
+                ><span class="field-desc"
+                  >Which factors drove the score up or down.</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Risk Snapshot Block</div>
+            <div class="field-list" style="margin: 0">
+              <div class="field-row">
+                <span class="field-name">Active Buckets</span
+                ><span class="field-desc"
+                  >Which plan timeframes this stock qualifies for.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">R:R</span
+                ><span class="field-desc"
+                  >Risk-to-reward ratio for each bucket.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Entry / Stop / Target</span
+                ><span class="field-desc"
+                  >Full range for each plan bucket.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Volatility & Drawdown</span
+                ><span class="field-desc"
+                  >Historical price swings to calibrate your stop
+                  placement.</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Broker Block</div>
+            <div class="field-list" style="margin: 0">
+              <div class="field-row">
+                <span class="field-name">Buy/Sell Amount & Ratio</span
+                ><span class="field-desc">Quantified broker activity.</span>
+              </div>
+              <div class="field-row">
+                <span class="field-name">Flow Intensity</span
+                ><span class="field-desc"
+                  >How aggressive the dominant side is.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Lifecycle State</span
+                ><span class="field-desc"
+                  >Early accumulation, late distribution, etc.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Trust & Maturity</span
+                ><span class="field-desc"
+                  >How reliable and developed the broker signal is.</span
+                >
+              </div>
+              <div class="field-row">
+                <span class="field-name">Top Brokers</span
+                ><span class="field-desc"
+                  >Named brokers driving the dominant flow.</span
+                >
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 10: Exit Tracker -->
+        <section class="section" id="exit-tracker">
+          <div class="section-header">
+            <span class="section-num">SECTION 10</span>
+            <h2>Exit Signal Tracker</h2>
+          </div>
+          <p class="audience-beginner">
+            For stocks you
+            <strong style="color: var(--text-bright)">already hold</strong>.
+            This section tells you what to do with each open position.
+          </p>
+          <p class="audience-intermediate">
+            Execution: EXIT → close; TRIM → reduce risk; HOLD → keep plan but
+            monitor trigger notes.
+          </p>
+
+          <div class="field-list">
+            <div class="field-row">
+              <span class="field-name">Verdict</span>
+              <span class="field-desc">
+                <span class="tag tag-green">HOLD</span>&nbsp;
+                <span class="tag tag-gold">TRIM</span>&nbsp;
+                <span class="tag tag-red">EXIT</span>&nbsp;
+                <span class="tag tag-dim">DATA_UNAVAILABLE</span>
+              </span>
+            </div>
+            <div class="field-row">
+              <span class="field-name">Broker Flow (Recent/Prior)</span
+              ><span class="field-desc"
+                >Current vs previous period broker behavior comparison.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Conf Decay</span
+              ><span class="field-desc"
+                >Whether execution confidence has fallen since entry.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">State Shift</span
+              ><span class="field-desc"
+                >A meaningful change in the signal regime since you
+                entered.</span
+              >
+            </div>
+            <div class="field-row">
+              <span class="field-name">Exit Meta</span
+              ><span class="field-desc">Metadata explaining the verdict.</span>
+            </div>
+            <div class="field-row">
+              <span class="field-name">Trigger Notes</span
+              ><span class="field-desc"
+                >Specific conditions that caused the current verdict.</span
+              >
+            </div>
+          </div>
+
+          <div class="how-to">
+            <div class="ht-title">How to act on each verdict</div>
+            <ul>
+              <li>
+                <strong style="color: var(--red)">EXIT</strong> — Close position
+                according to your execution policy.
+              </li>
+              <li>
+                <strong style="color: var(--gold-light)">TRIM</strong> — Reduce
+                risk: partially book profit or tighten your stop.
+              </li>
+              <li>
+                <strong style="color: var(--green)">HOLD</strong> — Keep plan
+                active. Continue monitoring next report.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <hr class="divider" />
+
+        <!-- Badge Meanings -->
+        <section class="section" id="badges">
+          <div class="section-header">
+            <span class="section-num">REFERENCE</span>
+            <h2>Badge Meanings</h2>
+          </div>
+
+          <div class="card" style="margin-bottom: 16px">
+            <div class="card-title">Action Badge</div>
+            <table class="badge-table">
+              <thead>
+                <tr>
+                  <th>Badge</th>
+                  <th>Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="tag tag-green">BUY</span></td>
+                  <td>Strongest actionable bias — setup is complete.</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag-gold">WATCH</span></td>
+                  <td>
+                    Setup is incomplete or moderate quality. Monitor, don't act
+                    yet.
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag-red">AVOID</span></td>
+                  <td>
+                    Avoid fresh entry unless context changes significantly.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Broker Flow Badge</div>
+            <table class="badge-table">
+              <thead>
+                <tr>
+                  <th>Badge</th>
+                  <th>Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="tag tag-green">BUY HEAVY</span></td>
+                  <td>
+                    Buy pressure dominant — institutional accumulation in
+                    progress.
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag-red">SELL HEAVY</span></td>
+                  <td>Sell pressure dominant — distribution is active.</td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag-gold">TWO-WAY</span></td>
+                  <td>
+                    Mixed flow — require tighter risk control and smaller size.
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="tag tag-dim">NO FLOW</span></td>
+                  <td>No clear broker flow edge detected.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Daily Workflow -->
+        <section class="section" id="workflow">
+          <div class="section-header">
+            <span class="section-num">WORKFLOW</span>
+            <h2>Practical Daily Workflow</h2>
+          </div>
+          <p class="audience-beginner">
+            Follow these steps every day before placing any orders.
+          </p>
+          <p class="audience-intermediate">
+            Daily loop: quality → regime → shortlist → View → execute → tracker.
+          </p>
+
+          <div class="workflow">
+            <div class="workflow-step">
+              <div class="step-num">1</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Open the latest report</strong>
+                <p>
+                  Always work from the most recent
+                  <code>master_trader_report_YYYY-MM-DD.html</code>.
+                </p>
+              </div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">2</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Check Data Sources & Accuracy first</strong>
+                <p>
+                  If data is stale or accuracy is weak, reduce risk or wait.
+                </p>
+              </div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">3</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Read the Market Dashboard</strong>
+                <p>
+                  Determine broad risk-on / risk-off tone before looking at
+                  individual stocks.
+                </p>
+              </div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">4</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Build your shortlist</strong>
+                <p>
+                  Start from the Hotlist, then review top rows in each plan
+                  section.
+                </p>
+              </div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">5</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Open View for each candidate</strong>
+                <p>
+                  Confirm: acceptable entry & stop · acceptable R:R · good data
+                  quality · no critical veto warnings.
+                </p>
+              </div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">6</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Enter only when price is in entry zone</strong>
+                <p>
+                  Do not chase. If price has moved away from the zone, wait.
+                </p>
+              </div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">7</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Track open trades with Exit Signal Tracker</strong>
+                <p>Act on HOLD / TRIM / EXIT verdicts immediately.</p>
+              </div>
+            </div>
+            <div class="workflow-step">
+              <div class="step-num">8</div>
+              <div class="step-line"></div>
+              <div class="step-body">
+                <strong>Review again after next report update</strong>
+                <p>
+                  Signals and verdicts change. Repeat the workflow each session.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Risk Rules -->
+        <section class="section" id="risk">
+          <div class="section-header">
+            <span class="section-num">RULES</span>
+            <h2>Risk Rules You Must Keep</h2>
+          </div>
+          <p class="audience-beginner">
+            These rules protect you when signals look exciting but the trade is
+            actually unsafe. Treat them as non-negotiable.
+          </p>
+          <p class="audience-intermediate">
+            Non-negotiables: stop first, no size-up on weak data, don’t force
+            trades, obey TRIM/EXIT, cap per-trade risk.
+          </p>
+          <div class="risk-rules">
+            <div class="risk-rule">
+              <div class="risk-icon">✕</div>
+              <span>Never enter a trade without a stop loss in place.</span>
+            </div>
+            <div class="risk-rule">
+              <div class="risk-icon">✕</div>
+              <span
+                >Never increase position size when data quality is weak.</span
+              >
+            </div>
+            <div class="risk-rule">
+              <div class="risk-icon">✕</div>
+              <span>Avoid forcing trades when quality metrics are poor.</span>
+            </div>
+            <div class="risk-rule">
+              <div class="risk-icon">✕</div>
+              <span
+                >Always respect EXIT and TRIM verdicts from the Exit Signal
+                Tracker.</span
+              >
+            </div>
+            <div class="risk-rule">
+              <div class="risk-icon">✕</div>
+              <span
+                >Keep per-trade risk capped at your pre-defined plan
+                limit.</span
+              >
+            </div>
+          </div>
+
+          <div
+            class="alert"
+            style="margin-top: 28px; border-left-color: var(--text-dim)"
+          >
+            <div class="alert-icon">📋</div>
+            <div class="alert-body">
+              <strong>Important note:</strong> This report is a decision-support
+              tool, not a guaranteed profit engine. Final execution
+              responsibility always rests with the trader. Discipline and risk
+              management matter more than any single score.
+            </div>
+          </div>
+        </section>
+      </div>
+      <!-- /content -->
+    </main>
+
+    <script>
+      // Mobile sidebar toggle
+      const btn = document.getElementById("menuBtn");
+      const sidebar = document.getElementById("sidebar");
+      const setSidebarOpen = (isOpen) => {
+        sidebar.classList.toggle("open", isOpen);
+        btn.setAttribute("aria-expanded", String(isOpen));
+      };
+      btn.addEventListener("click", () =>
+        setSidebarOpen(!sidebar.classList.contains("open")),
+      );
+      document
+        .querySelectorAll(".nav-link")
+        .forEach((l) =>
+          l.addEventListener("click", () => setSidebarOpen(false)),
+        );
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") setSidebarOpen(false);
+      });
+
+      // Active nav link on scroll
+      const sections = document.querySelectorAll("section[id], .hero[id]");
+      const links = document.querySelectorAll('.nav-link[href^="#"]');
+      const setActiveLink = (id) => {
+        links.forEach((l) => {
+          const isActive = l.getAttribute("href") === `#${id}`;
+          l.classList.toggle("active", isActive);
+          if (isActive) l.setAttribute("aria-current", "true");
+          else l.removeAttribute("aria-current");
+        });
+      };
+
+      // Pick the top-most visible section, rather than whichever intersects last.
+      const visible = new Map();
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) visible.set(entry.target.id, entry);
+            else visible.delete(entry.target.id);
+          });
+
+          if (visible.size === 0) return;
+
+          const best = Array.from(visible.values()).sort(
+            (a, b) => b.intersectionRatio - a.intersectionRatio,
+          )[0];
+          if (best && best.target && best.target.id)
+            setActiveLink(best.target.id);
+        },
+        {
+          rootMargin: "-25% 0px -65% 0px",
+          threshold: [0.1, 0.2, 0.35, 0.5, 0.75],
+        },
+      );
+
+      sections.forEach((s) => observer.observe(s));
+
+      // Reveal sections as they enter viewport
+      const revealObs = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("is-visible");
+            revealObs.unobserve(entry.target);
+          });
+        },
+        { threshold: 0.08 },
+      );
+
+      document
+        .querySelectorAll(".section")
+        .forEach((s) => revealObs.observe(s));
+
+      // Initial state
+      const initialHash = (location.hash || "").replace("#", "");
+      if (initialHash) setActiveLink(initialHash);
+      else setActiveLink("purpose");
+
+      // Audience toggle (Beginner / Intermediate)
+      const audBeginner = document.getElementById("audBeginner");
+      const audIntermediate = document.getElementById("audIntermediate");
+      const AUD_KEY = "master_trader_user_guide_audience";
+
+      const setAudience = (mode) => {
+        const normalized =
+          mode === "intermediate" ? "intermediate" : "beginner";
+        document.body.dataset.audience = normalized;
+
+        const isBeg = normalized === "beginner";
+        audBeginner.setAttribute("aria-selected", String(isBeg));
+        audIntermediate.setAttribute("aria-selected", String(!isBeg));
+
+        try {
+          localStorage.setItem(AUD_KEY, normalized);
+        } catch (_) {}
+      };
+
+      audBeginner.addEventListener("click", () => setAudience("beginner"));
+      audIntermediate.addEventListener("click", () =>
+        setAudience("intermediate"),
+      );
+
+      try {
+        const saved = localStorage.getItem(AUD_KEY);
+        if (saved) setAudience(saved);
+      } catch (_) {
+        // ignore
+      }
+    </script>
+  </body>
+</html>

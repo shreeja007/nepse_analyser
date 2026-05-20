@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAHAS Trade Plan — Feb 24, 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06090f;
+    --card: #0c111d;
+    --card2: #111827;
+    --border: #1f2d45;
+    --border2: #263347;
+    --green: #22d98a;
+    --green2: rgba(34,217,138,0.12);
+    --green3: rgba(34,217,138,0.06);
+    --red: #f4455a;
+    --red2: rgba(244,69,90,0.12);
+    --amber: #f59e0b;
+    --amber2: rgba(245,158,11,0.12);
+    --blue: #60a5fa;
+    --blue2: rgba(96,165,250,0.12);
+    --purple: #c084fc;
+    --text: #e2eaf5;
+    --muted: #4b6080;
+    --muted2: #8ca3bf;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --display: 'Bebas Neue', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { 
+    font-family: var(--sans); background: var(--bg); color: var(--text); 
+    min-height: 100vh; padding: 32px 20px;
+  }
+
+  .page { max-width: 960px; margin: 0 auto; }
+
+  /* Top bar */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 28px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    letter-spacing: 1.5px; text-transform: uppercase;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .live { display: flex; align-items: center; gap: 6px; color: var(--green); }
+  .live-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,217,138,0.4)} 50%{box-shadow:0 0 0 6px rgba(34,217,138,0)} }
+
+  /* Hero */
+  .hero {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px 36px; margin-bottom: 20px;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: 'SAHAS';
+    position: absolute; right: -20px; top: -20px;
+    font-family: var(--display); font-size: 140px; color: rgba(34,217,138,0.04);
+    line-height: 1; letter-spacing: -4px; pointer-events: none;
+    user-select: none;
+  }
+  .hero-grid { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: start; }
+  .hero-tag { font-family: var(--mono); font-size: 10px; color: var(--green); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 8px; }
+  .hero-name { font-family: var(--display); font-size: 3.5rem; letter-spacing: 1px; color: #fff; line-height: 1; margin-bottom: 6px; }
+  .hero-company { color: var(--muted2); font-size: 14px; margin-bottom: 20px; }
+  
+  .action-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--green2); border: 1.5px solid var(--green);
+    border-radius: 8px; padding: 10px 20px;
+    font-family: var(--display); font-size: 1.5rem; letter-spacing: 2px; color: var(--green);
+  }
+
+  .price-block { text-align: right; }
+  .price-lbl { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; margin-bottom: 4px; }
+  .price-now { font-family: var(--display); font-size: 3rem; color: #fff; letter-spacing: 1px; }
+  .price-range { font-family: var(--mono); font-size: 11px; color: var(--muted2); margin-top: 4px; }
+  .price-range-inner { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+  .price-range-item { font-family: var(--mono); font-size: 10px; }
+
+  /* Score strip */
+  .score-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); border-radius: 10px; overflow: hidden; margin-top: 24px; }
+  .score-cell { background: var(--card2); padding: 14px 12px; text-align: center; }
+  .score-cell .sl { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 5px; }
+  .score-cell .sv { font-family: var(--display); font-size: 1.5rem; }
+  .sv.green { color: var(--green); }
+  .sv.amber { color: var(--amber); }
+  .sv.red { color: var(--red); }
+  .sv.blue { color: var(--blue); }
+  .sv.white { color: #fff; }
+
+  /* Main grid */
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media(max-width:700px) { .main-grid { grid-template-columns: 1fr; } .hero-grid { grid-template-columns: 1fr; } }
+
+  /* Level card */
+  .level-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 24px; position: relative;
+  }
+  .lc-title { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+  .lc-title::before { content: ''; width: 16px; height: 1px; }
+  .lc-title.buy-t::before { background: var(--green); }
+  .lc-title.sell-t::before { background: var(--red); }
+  .lc-title.entry-t::before { background: var(--amber); }
+
+  /* Visual price ladder */
+  .ladder { position: relative; margin: 8px 0; }
+  .ladder-line { position: relative; display: flex; align-items: center; margin-bottom: 12px; gap: 14px; }
+  .ladder-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; position: relative; }
+  .ladder-dot.target3 { background: #22d98a; box-shadow: 0 0 12px rgba(34,217,138,0.5); }
+  .ladder-dot.target2 { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.4); }
+  .ladder-dot.target1 { background: #86efac; }
+  .ladder-dot.now { background: var(--blue); box-shadow: 0 0 12px rgba(96,165,250,0.5); border: 2px solid #fff; }
+  .ladder-dot.entry { background: var(--amber); }
+  .ladder-dot.sl-tight { background: #fca5a5; }
+  .ladder-dot.sl-wide { background: var(--red); box-shadow: 0 0 8px rgba(244,69,90,0.4); }
+  .ladder-connector { position: absolute; left: 5.5px; top: 12px; width: 1px; height: calc(100% + 12px); background: var(--border2); }
+  
+  .ladder-info { flex: 1; }
+  .ladder-name { font-size: 12px; color: var(--muted2); margin-bottom: 1px; }
+  .ladder-price { font-family: var(--mono); font-size: 18px; font-weight: 500; color: #fff; }
+  .ladder-sub { font-family: var(--mono); font-size: 10px; margin-top: 2px; }
+  .ladder-sub.up { color: var(--green); }
+  .ladder-sub.down { color: var(--red); }
+  .ladder-sub.neu { color: var(--muted2); }
+
+  .level-badge { 
+    margin-left: auto; font-family: var(--mono); font-size: 10px; font-weight: 500;
+    padding: 3px 10px; border-radius: 5px; letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .lb-t { background: var(--green2); color: var(--green); }
+  .lb-e { background: var(--amber2); color: var(--amber); }
+  .lb-sl { background: var(--red2); color: var(--red); }
+  .lb-now { background: var(--blue2); color: var(--blue); }
+
+  /* Historical price chart (CSS bar chart) */
+  .history-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; margin-bottom: 16px; }
+  .hist-title { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; }
+  .hist-chart { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+  .hist-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .hist-bar {
+    width: 100%; border-radius: 3px 3px 0 0;
+    position: relative; display: flex; align-items: flex-start; justify-content: center;
+  }
+  .hist-bar.up { background: linear-gradient(to top, rgba(34,217,138,0.5), rgba(34,217,138,0.2)); }
+  .hist-bar.down { background: linear-gradient(to top, rgba(244,69,90,0.5), rgba(244,69,90,0.2)); }
+  .hist-bar.current { background: linear-gradient(to top, rgba(96,165,250,0.7), rgba(96,165,250,0.2)); }
+  .hist-price { font-family: var(--mono); font-size: 8px; color: var(--muted2); position: absolute; top: -14px; white-space: nowrap; }
+  .hist-date { font-family: var(--mono); font-size: 8px; color: var(--muted); text-align: center; }
+  .hist-signal { font-family: var(--mono); font-size: 7px; text-align: center; margin-top: 2px; }
+  .hist-signal.buy { color: var(--green); }
+  .hist-signal.hold { color: var(--amber); }
+
+  .range-line { 
+    position: relative; height: 2px; background: var(--border2); 
+    border-radius: 1px; margin: 8px 0 4px;
+  }
+  .range-marker { 
+    position: absolute; top: -3px; width: 8px; height: 8px; border-radius: 50%;
+    transform: translateX(-50%);
+  }
+  .range-labels { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--muted); }
+
+  /* Indicator grid */
+  .indicator-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+  .ind-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .ind-item { background: var(--card2); border-radius: 8px; padding: 12px; border: 1px solid var(--border); }
+  .ind-lbl { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 5px; }
+  .ind-val { font-family: var(--mono); font-size: 16px; font-weight: 500; }
+  .ind-val.bull { color: var(--green); }
+  .ind-val.bear { color: var(--red); }
+  .ind-val.neu { color: var(--amber); }
+  .ind-val.blue { color: var(--blue); }
+  .ind-bar { height: 3px; border-radius: 2px; background: var(--border2); margin-top: 6px; overflow: hidden; }
+  .ind-bar-fill { height: 100%; border-radius: 2px; }
+  .ind-status { font-size: 9px; margin-top: 4px; }
+  .ind-status.bull { color: var(--green); }
+  .ind-status.bear { color: var(--red); }
+  .ind-status.neu { color: var(--amber); }
+
+  /* Reason cards */
+  .reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .reason-item { 
+    padding: 12px 14px; border-radius: 8px; font-size: 12px; line-height: 1.6;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .reason-item.for { background: var(--green3); border-left: 2px solid var(--green); }
+  .reason-item.against { background: var(--red2); border-left: 2px solid var(--red); }
+  .reason-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+  .reason-text { color: var(--text); }
+
+  /* FINAL BOX */
+  .final-box {
+    background: linear-gradient(135deg, rgba(34,217,138,0.07), rgba(96,165,250,0.05));
+    border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; margin-top: 16px;
+    border-top: 3px solid var(--green);
+  }
+  .final-title { font-family: var(--display); font-size: 1.8rem; letter-spacing: 1px; color: #fff; margin-bottom: 20px; }
+  .final-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  @media(max-width:700px) { .final-grid { grid-template-columns: 1fr; } .reason-grid { grid-template-columns: 1fr; } .ind-grid { grid-template-columns: repeat(2,1fr); } }
+
+  .final-level { 
+    border-radius: 12px; padding: 20px; text-align: center;
+  }
+  .final-level.entry { background: var(--amber2); border: 1px solid rgba(245,158,11,0.3); }
+  .final-level.target { background: var(--green2); border: 1px solid rgba(34,217,138,0.3); }
+  .final-level.stoploss { background: var(--red2); border: 1px solid rgba(244,69,90,0.3); }
+  .final-level-label { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .final-level.entry .final-level-label { color: var(--amber); }
+  .final-level.target .final-level-label { color: var(--green); }
+  .final-level.stoploss .final-level-label { color: var(--red); }
+  .final-level-price { font-family: var(--display); font-size: 2.2rem; letter-spacing: 1px; color: #fff; margin-bottom: 4px; }
+  .final-level-sub { font-family: var(--mono); font-size: 11px; }
+  .final-level.entry .final-level-sub { color: var(--amber); }
+  .final-level.target .final-level-sub { color: var(--green); }
+  .final-level.stoploss .final-level-sub { color: var(--red); }
+
+  .final-note { font-size: 13px; color: var(--muted2); line-height: 1.8; padding-top: 16px; border-top: 1px solid var(--border); }
+  .final-note strong { color: var(--text); }
+  .fn-warn { color: var(--amber); }
+
+  /* System comparison */
+  .sys-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .sys-table th { color: var(--muted); font-size: 9px; letter-spacing: 2px; padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+  .sys-table th:first-child { text-align: left; }
+  .sys-table td { padding: 10px 10px; border-bottom: 1px solid rgba(31,45,69,0.5); text-align: right; }
+  .sys-table td:first-child { text-align: left; color: var(--muted2); }
+  .sys-table tr:last-child td { border-bottom: none; font-weight: 600; }
+  .sys-table .td-green { color: var(--green); font-weight: 600; }
+  .sys-table .td-red { color: var(--red); font-weight: 600; }
+  .sys-table .td-amber { color: var(--amber); font-weight: 600; }
+  .sys-table .td-white { color: #fff; font-weight: 700; }
+
+  footer { margin-top: 32px; text-align: center; font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <span>NEPSE · Trade Plan · Feb 24, 2026</span>
+    <div class="topbar-right">
+      <span>NSC: SAHAS</span>
+      <span class="live"><span class="live-pulse"></span>MARKET OPEN</span>
+    </div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-tag">Hydro Power · Sahas Urja Limited</div>
+        <div class="hero-name">SAHAS</div>
+        <div class="hero-company">Sahas Urja Limited — #1 Ranked Stock of 329 · Feb 23, 2026</div>
+        <div class="action-pill">⬆ BUY — ENTER TODAY</div>
+      </div>
+      <div class="price-block">
+        <div class="price-lbl">Last Trade Price</div>
+        <div class="price-now">Rs 554</div>
+        <div class="price-range">3-week range</div>
+        <div class="price-range-inner">
+          <span class="price-range-item" style="color:var(--red)">Low: Rs 550.80</span>
+          <span class="price-range-item" style="color:var(--muted)">→</span>
+          <span class="price-range-item" style="color:var(--green)">High: Rs 566.10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Score strip -->
+    <div class="score-strip">
+      <div class="score-cell">
+        <div class="sl">Overall Score</div>
+        <div class="sv green">74.0</div>
+      </div>
+      <div class="score-cell">
+        <div class="sl">Fundamental</div>
+        <div class="sv green">84/100</div>
+      </div>
+      <div class="score-cell">
+        <div class="sl">Volume Score</div>
+        <div class="sv green">80/100</div>
+      </div>
+      <div class="score-cell">
+        <div class="sl">Technical</div>
+        <div class="sv amber">52/100</div>
+      </div>
+      <div class="score-cell">
+        <div class="sl">PE vs Sector</div>
+        <div class="sv green">14x vs 103x</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Price Ladder + System Comparison -->
+  <div class="main-grid">
+
+    <!-- ENTRY / TARGET / SL ladder -->
+    <div class="level-card">
+      <div class="lc-title buy-t">Price Levels — All Systems Combined</div>
+
+      <div class="ladder">
+
+        <!-- T2 -->
+        <div class="ladder-line">
+          <div class="ladder-dot target3" style="position:relative">
+            <div class="ladder-connector"></div>
+          </div>
+          <div class="ladder-info">
+            <div class="ladder-name">TARGET 2 — Extended Hold</div>
+            <div class="ladder-price">Rs 613.65</div>
+            <div class="ladder-sub up">+10.8% from entry · Sell 25% here</div>
+          </div>
+          <div class="level-badge lb-t">T2</div>
+        </div>
+
+        <!-- T1 -->
+        <div class="ladder-line">
+          <div class="ladder-dot target1" style="position:relative">
+            <div class="ladder-connector"></div>
+          </div>
+          <div class="ladder-info">
+            <div class="ladder-name">TARGET 1 — Primary Profit</div>
+            <div class="ladder-price">Rs 589.79</div>
+            <div class="ladder-sub up">+6.5% from entry · Sell 50% here</div>
+          </div>
+          <div class="level-badge lb-t">T1</div>
+        </div>
+
+        <!-- T0 (conservative) -->
+        <div class="ladder-line">
+          <div class="ladder-dot target2" style="position:relative">
+            <div class="ladder-connector"></div>
+          </div>
+          <div class="ladder-info">
+            <div class="ladder-name">TARGET 0 — Quick Profit (Report)</div>
+            <div class="ladder-price">Rs 577.80</div>
+            <div class="ladder-sub up">+4.3% from entry · Book partial if MACD stays negative</div>
+          </div>
+          <div class="level-badge lb-t">T0</div>
+        </div>
+
+        <!-- CURRENT PRICE -->
+        <div class="ladder-line">
+          <div class="ladder-dot now" style="position:relative">
+            <div class="ladder-connector"></div>
+          </div>
+          <div class="ladder-info">
+            <div class="ladder-name">CURRENT PRICE</div>
+            <div class="ladder-price" style="color:var(--blue)">Rs 554.00</div>
+            <div class="ladder-sub neu">Now — already inside entry zone</div>
+          </div>
+          <div class="level-badge lb-now">NOW</div>
+        </div>
+
+        <!-- ENTRY ZONE -->
+        <div class="ladder-line">
+          <div class="ladder-dot entry" style="position:relative">
+            <div class="ladder-connector"></div>
+          </div>
+          <div class="ladder-info">
+            <div class="ladder-name">IDEAL ENTRY ZONE (SMA 50 support)</div>
+            <div class="ladder-price" style="color:var(--amber)">Rs 548 – Rs 560</div>
+            <div class="ladder-sub neu">SMA 50 = Rs 552.52 · Buy between Rs 548-560</div>
+          </div>
+          <div class="level-badge lb-e">ENTRY</div>
+        </div>
+
+        <!-- SL Tight -->
+        <div class="ladder-line">
+          <div class="ladder-dot sl-tight" style="position:relative">
+            <div class="ladder-connector"></div>
+          </div>
+          <div class="ladder-info">
+            <div class="ladder-name">STOP LOSS — Conservative (Report)</div>
+            <div class="ladder-price" style="color:#fca5a5">Rs 536.15</div>
+            <div class="ladder-sub down">−3.2% from entry · Recommended for most traders</div>
+          </div>
+          <div class="level-badge lb-sl">SL-C</div>
+        </div>
+
+        <!-- SL Wide -->
+        <div class="ladder-line">
+          <div class="ladder-dot sl-wide">
+          </div>
+          <div class="ladder-info">
+            <div class="ladder-name">STOP LOSS — Hard Floor (All-Stocks)</div>
+            <div class="ladder-price" style="color:var(--red)">Rs 530.14</div>
+            <div class="ladder-sub down">−4.3% from entry · Absolute exit, below all support</div>
+          </div>
+          <div class="level-badge lb-sl">SL-H</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- System comparison table -->
+    <div class="level-card">
+      <div class="lc-title entry-t">What Each System Says</div>
+      <table class="sys-table">
+        <thead>
+          <tr>
+            <th>System</th>
+            <th>Signal</th>
+            <th>Entry</th>
+            <th>Stop Loss</th>
+            <th>Target</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>All-Stocks Score</td>
+            <td class="td-green">BUY 80%</td>
+            <td>554</td>
+            <td class="td-red">530.14</td>
+            <td class="td-green">589 / 613</td>
+          </tr>
+          <tr>
+            <td>Overnight Report</td>
+            <td class="td-amber">HOLD 53%</td>
+            <td>548–560</td>
+            <td class="td-red">536.15</td>
+            <td class="td-green">577.80</td>
+          </tr>
+          <tr>
+            <td>Dashboard Fund.</td>
+            <td class="td-green">7/10 BUY</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>Smart Money</td>
+            <td class="td-green">BUYING</td>
+            <td>—</td>
+            <td>—</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td style="color:#fff;font-weight:700">CONSENSUS</td>
+            <td class="td-green td-white">BUY</td>
+            <td class="td-white">548–560</td>
+            <td class="td-red">530–536</td>
+            <td class="td-green">578–614</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:20px;">
+        <div class="lc-title entry-t" style="margin-bottom:14px">SAHAS Price History (Feb 6 → 24)</div>
+        <!-- CSS Bar Chart -->
+        <div class="hist-chart">
+          <!-- Base: 550, Range: 20, Height: 80px, 1px = 4 units -->
+          <div class="hist-bar-wrap">
+            <div class="hist-bar up" style="height:34px;position:relative"><span class="hist-price">558.5</span></div>
+            <div class="hist-date">F6</div><div class="hist-signal buy">BUY</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar up" style="height:56px;position:relative"><span class="hist-price">564.3</span></div>
+            <div class="hist-date">F8</div><div class="hist-signal buy">S.BUY</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar down" style="height:25px;position:relative"><span class="hist-price">556.1</span></div>
+            <div class="hist-date">F9</div><div class="hist-signal buy">BUY</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar down" style="height:4px;position:relative"><span class="hist-price">550.8</span></div>
+            <div class="hist-date">F10</div><div class="hist-signal hold">HOLD</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar up" style="height:18px;position:relative"><span class="hist-price">554.5</span></div>
+            <div class="hist-date">F12</div><div class="hist-signal buy">BUY</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar up" style="height:25px;position:relative"><span class="hist-price">557.0</span></div>
+            <div class="hist-date">F16</div><div class="hist-signal hold">HOLD</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar down" style="height:22px;position:relative"><span class="hist-price">556.0</span></div>
+            <div class="hist-date">F17</div><div class="hist-signal hold">HOLD</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar down" style="height:12px;position:relative"><span class="hist-price">553.0</span></div>
+            <div class="hist-date">F22</div><div class="hist-signal hold">HOLD</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar up" style="height:18px;position:relative"><span class="hist-price">554.0</span></div>
+            <div class="hist-date">F23</div><div class="hist-signal buy">BUY↑</div>
+          </div>
+          <div class="hist-bar-wrap">
+            <div class="hist-bar current" style="height:18px;position:relative"><span class="hist-price">554.0</span></div>
+            <div class="hist-date">F24</div><div class="hist-signal buy" style="color:var(--blue)">TODAY</div>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <div class="range-line">
+            <div class="range-marker" style="left:0%;background:var(--red)"></div>
+            <div class="range-marker" style="left:70%;background:var(--blue)"></div>
+            <div class="range-marker" style="left:100%;background:var(--green)"></div>
+          </div>
+          <div class="range-labels">
+            <span style="color:var(--red)">Low: 550.8</span>
+            <span style="color:var(--blue)">Now: 554</span>
+            <span style="color:var(--green)">High: 566.1</span>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted)">
+          SAHAS has held Rs 550-566 range for 3 weeks. Support at Rs 550-553 is extremely strong — tested 4 times without breaking.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Technical Indicators -->
+  <div class="indicator-card" style="margin-bottom:16px;">
+    <div class="lc-title entry-t" style="margin-bottom:16px;">Technical Indicators — What They Say</div>
+    <div class="ind-grid">
+      <div class="ind-item">
+        <div class="ind-lbl">RSI (14)</div>
+        <div class="ind-val neu">47.1</div>
+        <div class="ind-bar"><div class="ind-bar-fill" style="width:47%;background:var(--amber)"></div></div>
+        <div class="ind-status neu">Neutral — Not overbought, safe to enter</div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-lbl">MACD</div>
+        <div class="ind-val bear">−1.05</div>
+        <div class="ind-bar"><div class="ind-bar-fill" style="width:30%;background:var(--red)"></div></div>
+        <div class="ind-status bear">⚠ Slightly bearish — Key risk, watch daily</div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-lbl">Stochastic</div>
+        <div class="ind-val bull">18/19</div>
+        <div class="ind-bar"><div class="ind-bar-fill" style="width:18%;background:var(--green)"></div></div>
+        <div class="ind-status bull">Oversold — Reversal signal ↑</div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-lbl">SMA 20</div>
+        <div class="ind-val bear">561.40</div>
+        <div class="ind-bar"><div class="ind-bar-fill" style="width:50%;background:var(--red)"></div></div>
+        <div class="ind-status bear">Price below SMA20 — short resistance at 561</div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-lbl">SMA 50</div>
+        <div class="ind-val bull">552.52</div>
+        <div class="ind-bar"><div class="ind-bar-fill" style="width:75%;background:var(--green)"></div></div>
+        <div class="ind-status bull">Price ABOVE SMA50 — uptrend intact ✓</div>
+      </div>
+      <div class="ind-item">
+        <div class="ind-lbl">OBV / MFI</div>
+        <div class="ind-val bull">Accum</div>
+        <div class="ind-bar"><div class="ind-bar-fill" style="width:52%;background:var(--green)"></div></div>
+        <div class="ind-status bull">MFI 52.7 · Smart money accumulating</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pros/Cons -->
+  <div class="level-card" style="margin-bottom:16px;">
+    <div class="lc-title buy-t">Why Buy / Why Be Careful</div>
+    <div class="reason-grid">
+      <div class="reason-item for"><span class="reason-icon">✅</span><span class="reason-text"><strong>PE 13.85x vs Sector 103x</strong> — SAHAS is 87% cheaper than the average hydro stock. Enormous value cushion.</span></div>
+      <div class="reason-item against"><span class="reason-icon">⚠️</span><span class="reason-text"><strong>MACD is −1.05</strong> — Slight bearish momentum. Don't go all-in at once. Buy in 2 tranches.</span></div>
+      <div class="reason-item for"><span class="reason-icon">✅</span><span class="reason-text"><strong>EPS Rs 39.57, Growth +65.7%</strong> — Earnings growing explosively. Fundamentals justify the price strongly.</span></div>
+      <div class="reason-item against"><span class="reason-icon">⚠️</span><span class="reason-text"><strong>Fib 61.8% level broken</strong> — Report flags this as trend invalid short-term. Technical structure is weak.</span></div>
+      <div class="reason-item for"><span class="reason-icon">✅</span><span class="reason-text"><strong>Smart Money buying, OBV accumulation</strong> — Institutional buy concentration 52%. Big players are loading up.</span></div>
+      <div class="reason-item against"><span class="reason-icon">⚠️</span><span class="reason-text"><strong>OBV falling per report</strong> — Distribution signal conflicts with accumulation signal. Mixed volume picture.</span></div>
+      <div class="reason-item for"><span class="reason-icon">✅</span><span class="reason-text"><strong>Stochastic 18/19 — Deeply oversold</strong> — This is a classic buy signal. Historically bounces from here.</span></div>
+      <div class="reason-item for"><span class="reason-icon">✅</span><span class="reason-text"><strong>Rs 550-553 support tested 4 times, never broken</strong> — Very strong floor. Stop loss below this is safe.</span></div>
+      <div class="reason-item for"><span class="reason-icon">✅</span><span class="reason-text"><strong>ROE 23.2%, Net Profit Rs 904M</strong> — Genuinely profitable, high-quality company. Not speculation.</span></div>
+      <div class="reason-item for"><span class="reason-icon">✅</span><span class="reason-text"><strong>Dividend 22.1% bonus</strong> — Consistent dividend payer. Even if price stays flat, dividend adds return.</span></div>
+    </div>
+  </div>
+
+  <!-- THE FINAL RECOMMENDATION BOX -->
+  <div class="final-box">
+    <div class="final-title">YOUR SAHAS TRADE PLAN</div>
+    
+    <div class="final-grid">
+      <div class="final-level entry">
+        <div class="final-level-label">🟡 Buy Entry Zone</div>
+        <div class="final-level-price">Rs 548–560</div>
+        <div class="final-level-sub">Current price Rs 554 is already inside</div>
+        <div style="margin-top:10px;font-size:11px;font-family:var(--mono);color:var(--amber)">
+          Tranche 1: Rs 554 (now, 60%)<br>
+          Tranche 2: Rs 548 (on dip, 40%)
+        </div>
+      </div>
+      <div class="final-level target">
+        <div class="final-level-label">🟢 Targets (Sell in parts)</div>
+        <div class="final-level-price">Rs 578–614</div>
+        <div class="final-level-sub">T0: Rs 578 · T1: Rs 590 · T2: Rs 614</div>
+        <div style="margin-top:10px;font-size:11px;font-family:var(--mono);color:var(--green)">
+          At T0 (578): Sell 25%<br>
+          At T1 (590): Sell 50%<br>
+          At T2 (614): Sell remaining 25%
+        </div>
+      </div>
+      <div class="final-level stoploss">
+        <div class="final-level-label">🔴 Stop Loss</div>
+        <div class="final-level-price">Rs 536</div>
+        <div class="final-level-sub">If price closes below Rs 536 — exit fully</div>
+        <div style="margin-top:10px;font-size:11px;font-family:var(--mono);color:var(--red)">
+          Hard floor: Rs 530<br>
+          Max risk: −3.2% to −4.3%<br>
+          Max gain: +6.5% to +10.8%
+        </div>
+      </div>
+    </div>
+
+    <div class="final-note">
+      <strong>Risk:Reward → 1:2 to 1:2.5</strong> — For every Rs 1 you risk (on stop loss), you stand to gain Rs 2 to Rs 2.5 on the primary target. That's a healthy ratio for a NEPSE trade.<br><br>
+      <strong>Why 2 tranches?</strong> Because MACD is slightly negative (−1.05). If price dips to Rs 548 first, your average cost improves and you catch the SMA50 bounce. If it goes straight up from Rs 554, tranche 1 already captures the move.<br><br>
+      <span class="fn-warn">⚠️ Watch signal: If NEPSE index falls below −1.5% on any day while you hold SAHAS — check if your stop loss is intact. Given the recent bearish streak (9 of 10 red days), market risk remains elevated.</span>
+    </div>
+  </div>
+
+  <footer>
+    SAHAS Trade Plan · Based on: all_stocks_analysis_2026-02-23 + report_2026-02-23_23-25-24 + dashboard_2026-02-24 + historical data Feb 6–24 · ⚠️ Not financial advice
+  </footer>
+
+</div>
+</body>
+</html>

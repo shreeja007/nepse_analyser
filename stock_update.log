@@ -1,0 +1,110 @@
+2025-07-02 12:22:42,297 - INFO - === NEPSE Stock Map Updater ===
+2025-07-02 12:22:42,297 - INFO - API URL: http://localhost:8000
+2025-07-02 12:22:42,302 - INFO - Target file: stockmap.json
+2025-07-02 12:22:42,302 - DEBUG - load_ssl_context verify=True cert=None trust_env=True http2=False
+2025-07-02 12:22:42,302 - DEBUG - load_verify_locations cafile='C:\\Users\\Admin\\Desktop\\Work\\NepseAPI\\venv\\Lib\\site-packages\\certifi\\cacert.pem'
+2025-07-02 12:22:42,418 - INFO - Checking API server health...
+2025-07-02 12:22:42,426 - DEBUG - connect_tcp.started host='localhost' port=8000 local_address=None timeout=30.0 socket_options=None
+2025-07-02 12:22:42,689 - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000022D85C1F440>
+2025-07-02 12:22:42,689 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+2025-07-02 12:22:42,689 - DEBUG - send_request_headers.complete
+2025-07-02 12:22:42,689 - DEBUG - send_request_body.started request=<Request [b'GET']>
+2025-07-02 12:22:42,689 - DEBUG - send_request_body.complete
+2025-07-02 12:22:42,689 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+2025-07-02 12:22:42,697 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Wed, 02 Jul 2025 06:37:41 GMT'), (b'server', b'uvicorn'), (b'content-length', b'20'), (b'content-type', b'application/json')])
+2025-07-02 12:22:42,697 - INFO - HTTP Request: GET http://localhost:8000/health "HTTP/1.1 200 OK"
+2025-07-02 12:22:42,697 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+2025-07-02 12:22:42,699 - DEBUG - receive_response_body.complete
+2025-07-02 12:22:42,699 - DEBUG - response_closed.started
+2025-07-02 12:22:42,699 - DEBUG - response_closed.complete
+2025-07-02 12:22:42,699 - INFO - Backup created: stockmap_backup_20250702_122242.json
+2025-07-02 12:22:42,699 - INFO - Fetching security list...
+2025-07-02 12:22:42,699 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+2025-07-02 12:22:42,699 - DEBUG - send_request_headers.complete
+2025-07-02 12:22:42,699 - DEBUG - send_request_body.started request=<Request [b'GET']>
+2025-07-02 12:22:42,699 - DEBUG - send_request_body.complete
+2025-07-02 12:22:42,699 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+2025-07-02 12:22:42,803 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Wed, 02 Jul 2025 06:37:41 GMT'), (b'server', b'uvicorn'), (b'access-control-allow-origin', b'*'), (b'content-length', b'79983'), (b'content-type', b'application/json')])
+2025-07-02 12:22:42,803 - INFO - HTTP Request: GET http://localhost:8000/SecurityList "HTTP/1.1 200 OK"
+2025-07-02 12:22:42,803 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+2025-07-02 12:22:42,803 - DEBUG - receive_response_body.complete
+2025-07-02 12:22:42,803 - DEBUG - response_closed.started
+2025-07-02 12:22:42,803 - DEBUG - response_closed.complete
+2025-07-02 12:22:42,803 - INFO - Security data fetched: 521 items
+2025-07-02 12:22:42,803 - INFO - Fetching sector data...
+2025-07-02 12:22:42,808 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+2025-07-02 12:22:42,808 - DEBUG - send_request_headers.complete
+2025-07-02 12:22:42,809 - DEBUG - send_request_body.started request=<Request [b'GET']>
+2025-07-02 12:22:42,809 - DEBUG - send_request_body.complete
+2025-07-02 12:22:42,809 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+2025-07-02 12:22:42,945 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Wed, 02 Jul 2025 06:37:41 GMT'), (b'server', b'uvicorn'), (b'access-control-allow-origin', b'*'), (b'content-length', b'4367'), (b'content-type', b'application/json')])
+2025-07-02 12:22:42,945 - INFO - HTTP Request: GET http://localhost:8000/SectorScrips "HTTP/1.1 200 OK"
+2025-07-02 12:22:42,945 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+2025-07-02 12:22:42,945 - DEBUG - receive_response_body.complete
+2025-07-02 12:22:42,945 - DEBUG - response_closed.started
+2025-07-02 12:22:42,945 - DEBUG - response_closed.complete
+2025-07-02 12:22:42,945 - INFO - Sector data fetched: 14 sectors
+2025-07-02 12:22:42,945 - INFO - Processing data...
+2025-07-02 12:22:42,945 - INFO - Created symbol-sector map with 521 entries
+2025-07-02 12:22:42,945 - INFO - Created stock map with 491 entries
+2025-07-02 12:22:42,945 - INFO - Saving stock map...
+2025-07-02 12:22:42,953 - INFO - Stock map saved successfully to stockmap.json
+2025-07-02 12:22:42,955 - INFO - Stock map update completed successfully!
+2025-07-02 12:22:42,955 - INFO - Update completed successfully!
+2025-07-02 12:22:42,955 - DEBUG - close.started
+2025-07-02 12:22:42,955 - DEBUG - close.complete
+2025-07-02 12:23:42,270 - INFO - === NEPSE Stock Map Updater ===
+2025-07-02 12:23:42,270 - INFO - API URL: http://localhost:8000
+2025-07-02 12:23:42,270 - INFO - Target file: stockmap.json
+2025-07-02 12:23:42,270 - DEBUG - load_ssl_context verify=True cert=None trust_env=True http2=False
+2025-07-02 12:23:42,270 - DEBUG - load_verify_locations cafile='C:\\Users\\Admin\\Desktop\\Work\\NepseAPI\\venv\\Lib\\site-packages\\certifi\\cacert.pem'
+2025-07-02 12:23:42,397 - INFO - Checking API server health...
+2025-07-02 12:23:42,401 - DEBUG - connect_tcp.started host='localhost' port=8000 local_address=None timeout=30.0 socket_options=None
+2025-07-02 12:23:42,658 - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000027278E34560>
+2025-07-02 12:23:42,658 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+2025-07-02 12:23:42,658 - DEBUG - send_request_headers.complete
+2025-07-02 12:23:42,658 - DEBUG - send_request_body.started request=<Request [b'GET']>
+2025-07-02 12:23:42,658 - DEBUG - send_request_body.complete
+2025-07-02 12:23:42,658 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+2025-07-02 12:23:42,658 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Wed, 02 Jul 2025 06:38:42 GMT'), (b'server', b'uvicorn'), (b'content-length', b'20'), (b'content-type', b'application/json')])
+2025-07-02 12:23:42,658 - INFO - HTTP Request: GET http://localhost:8000/health "HTTP/1.1 200 OK"
+2025-07-02 12:23:42,658 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+2025-07-02 12:23:42,666 - DEBUG - receive_response_body.complete
+2025-07-02 12:23:42,666 - DEBUG - response_closed.started
+2025-07-02 12:23:42,666 - DEBUG - response_closed.complete
+2025-07-02 12:23:42,668 - INFO - Backup created: stockmap_backup_20250702_122342.json
+2025-07-02 12:23:42,668 - INFO - Fetching security list...
+2025-07-02 12:23:42,669 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+2025-07-02 12:23:42,669 - DEBUG - send_request_headers.complete
+2025-07-02 12:23:42,669 - DEBUG - send_request_body.started request=<Request [b'GET']>
+2025-07-02 12:23:42,669 - DEBUG - send_request_body.complete
+2025-07-02 12:23:42,669 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+2025-07-02 12:23:42,791 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Wed, 02 Jul 2025 06:38:42 GMT'), (b'server', b'uvicorn'), (b'access-control-allow-origin', b'*'), (b'content-length', b'79983'), (b'content-type', b'application/json')])
+2025-07-02 12:23:42,791 - INFO - HTTP Request: GET http://localhost:8000/SecurityList "HTTP/1.1 200 OK"
+2025-07-02 12:23:42,791 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+2025-07-02 12:23:42,797 - DEBUG - receive_response_body.complete
+2025-07-02 12:23:42,797 - DEBUG - response_closed.started
+2025-07-02 12:23:42,797 - DEBUG - response_closed.complete
+2025-07-02 12:23:42,797 - INFO - Security data fetched: 521 items
+2025-07-02 12:23:42,797 - INFO - Fetching sector data...
+2025-07-02 12:23:42,800 - DEBUG - send_request_headers.started request=<Request [b'GET']>
+2025-07-02 12:23:42,800 - DEBUG - send_request_headers.complete
+2025-07-02 12:23:42,800 - DEBUG - send_request_body.started request=<Request [b'GET']>
+2025-07-02 12:23:42,800 - DEBUG - send_request_body.complete
+2025-07-02 12:23:42,800 - DEBUG - receive_response_headers.started request=<Request [b'GET']>
+2025-07-02 12:23:42,800 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'date', b'Wed, 02 Jul 2025 06:38:42 GMT'), (b'server', b'uvicorn'), (b'access-control-allow-origin', b'*'), (b'content-length', b'4367'), (b'content-type', b'application/json')])
+2025-07-02 12:23:42,800 - INFO - HTTP Request: GET http://localhost:8000/SectorScrips "HTTP/1.1 200 OK"
+2025-07-02 12:23:42,802 - DEBUG - receive_response_body.started request=<Request [b'GET']>
+2025-07-02 12:23:42,802 - DEBUG - receive_response_body.complete
+2025-07-02 12:23:42,802 - DEBUG - response_closed.started
+2025-07-02 12:23:42,802 - DEBUG - response_closed.complete
+2025-07-02 12:23:42,802 - INFO - Sector data fetched: 14 sectors
+2025-07-02 12:23:42,802 - INFO - Processing data...
+2025-07-02 12:23:42,803 - INFO - Created symbol-sector map with 521 entries
+2025-07-02 12:23:42,803 - INFO - Created stock map with 491 entries
+2025-07-02 12:23:42,803 - INFO - Saving stock map...
+2025-07-02 12:23:42,805 - INFO - Stock map saved successfully to stockmap.json
+2025-07-02 12:23:42,806 - INFO - Stock map update completed successfully!
+2025-07-02 12:23:42,806 - INFO - Update completed successfully!
+2025-07-02 12:23:42,806 - DEBUG - close.started
+2025-07-02 12:23:42,806 - DEBUG - close.complete

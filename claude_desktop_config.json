@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "nepseapi-mcp-server": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with", "fastmcp",
+        "--with", "requests",
+        "--with", "pydantic",
+        "path\\to\\mcp_server.py"
+      ]
+    }
+  }
+}

@@ -1,0 +1,24 @@
+[project]
+name = "NepseAPI"
+version = "0.1.0"
+description = "Nepse API Server"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project.dependencies]
+fastapi = "==0.115.6"
+uvicorn = "==0.34.0"
+websockets = "==14.1"
+httptools = ">=0.6.4"
+fastmcp = "==2.10.1"
+pandas = ">=2.0.0"
+
+[project.urls]
+nepse = "git+https://github.com/surajrimal07/NepseUnofficialApi.git"
+
+[project.optional-dependencies]
+unix = ["uvloop"]

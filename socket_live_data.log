@@ -1,0 +1,84 @@
+2026-04-02 13:17:51,643 - __main__ - INFO - Fetching floorsheet for SIKLES...
+2026-04-02 13:17:53,699 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:17:53,700 - socket_live_data.floorsheet_client - INFO - Requesting floorsheet for SIKLES (messageId=2)
+2026-04-02 13:17:53,700 - socket_live_data.floorsheet_client - ERROR - Unexpected websocket request error: 'ClientConnection' object has no attribute 'closed'
+2026-04-02 13:17:55,729 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:17:55,852 - __main__ - INFO - Successfully fetched SIKLES floorsheet
+2026-04-02 13:17:55,854 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:18:38,949 - __main__ - INFO - Fetching floorsheet for SIKLES...
+2026-04-02 13:18:40,984 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:18:40,984 - socket_live_data.floorsheet_client - INFO - Requesting floorsheet for SIKLES (messageId=2)
+2026-04-02 13:18:40,984 - socket_live_data.floorsheet_client - ERROR - Unexpected websocket request error: 'ClientConnection' object has no attribute 'closed'
+2026-04-02 13:18:43,029 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:18:43,069 - __main__ - INFO - Successfully fetched SIKLES floorsheet
+2026-04-02 13:18:43,070 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:21:12,947 - __main__ - INFO - Fetching floorsheet for SIKLES...
+2026-04-02 13:21:14,977 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:21:14,978 - socket_live_data.floorsheet_client - INFO - Requesting floorsheet for SIKLES (messageId=2)
+2026-04-02 13:21:15,031 - __main__ - INFO - Successfully fetched SIKLES floorsheet
+2026-04-02 13:21:15,032 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:24:21,768 - __main__ - INFO - Fetching floorsheet for NABIL...
+2026-04-02 13:24:23,807 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:24:23,807 - socket_live_data.floorsheet_client - INFO - Requesting floorsheet for NABIL (messageId=2)
+2026-04-02 13:24:23,863 - __main__ - INFO - Successfully fetched NABIL floorsheet
+2026-04-02 13:24:23,864 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:26:17,000 - __main__ - INFO - Calling route Summary...
+2026-04-02 13:26:19,039 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:26:19,040 - socket_live_data.floorsheet_client - INFO - Requesting route Summary (messageId=1)
+2026-04-02 13:26:19,098 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:26:25,611 - __main__ - INFO - Calling route LiveMarket...
+2026-04-02 13:26:27,657 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:26:27,657 - socket_live_data.floorsheet_client - INFO - Requesting route LiveMarket (messageId=1)
+2026-04-02 13:26:27,701 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:26:44,062 - __main__ - INFO - Calling route CompanyDetails...
+2026-04-02 13:26:46,107 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:26:46,107 - socket_live_data.floorsheet_client - INFO - Requesting route CompanyDetails (messageId=1)
+2026-04-02 13:26:46,146 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:27:08,479 - __main__ - INFO - Calling route PriceVolumeHistory...
+2026-04-02 13:27:10,510 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:27:10,510 - socket_live_data.floorsheet_client - INFO - Requesting route PriceVolumeHistory (messageId=1)
+2026-04-02 13:27:10,563 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:27:20,999 - __main__ - INFO - Calling route DailyScripPriceGraph...
+2026-04-02 13:27:23,039 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:27:23,039 - socket_live_data.floorsheet_client - INFO - Requesting route DailyScripPriceGraph (messageId=1)
+2026-04-02 13:27:23,083 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:28:54,548 - __main__ - INFO - Calling route Summary...
+2026-04-02 13:28:56,587 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:28:56,587 - socket_live_data.floorsheet_client - INFO - Requesting route Summary (messageId=1)
+2026-04-02 13:28:56,630 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:29:58,668 - __main__ - INFO - Fetching floorsheet for NABIL...
+2026-04-02 13:30:00,719 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:30:00,719 - socket_live_data.floorsheet_client - INFO - Requesting floorsheet for NABIL (messageId=2)
+2026-04-02 13:30:00,774 - __main__ - ERROR - Failed to fetch NABIL floorsheet
+2026-04-02 13:30:00,775 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:31:48,893 - __main__ - INFO - Calling route SupplyDemand...
+2026-04-02 13:31:50,945 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:31:50,946 - socket_live_data.floorsheet_client - INFO - Requesting route SupplyDemand (messageId=1)
+2026-04-02 13:31:51,023 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:32:19,738 - __main__ - INFO - Calling route PriceVolumeHistory...
+2026-04-02 13:32:21,785 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:32:21,785 - socket_live_data.floorsheet_client - INFO - Requesting route PriceVolumeHistory (messageId=1)
+2026-04-02 13:32:21,824 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:34:40,482 - __main__ - INFO - Calling route CompanyDetails...
+2026-04-02 13:34:42,544 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:34:42,544 - socket_live_data.floorsheet_client - INFO - Requesting route CompanyDetails (messageId=1)
+2026-04-02 13:34:42,600 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:35:29,481 - __main__ - INFO - Calling route CompanyDetails...
+2026-04-02 13:35:31,532 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:35:31,532 - socket_live_data.floorsheet_client - INFO - Requesting route CompanyDetails (messageId=1)
+2026-04-02 13:35:31,607 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:41:01,586 - __main__ - INFO - Calling route Summary...
+2026-04-02 13:41:03,642 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:41:03,642 - socket_live_data.floorsheet_client - INFO - Requesting route Summary (messageId=1)
+2026-04-02 13:41:03,695 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:41:16,621 - __main__ - INFO - Calling route CompanyDetails...
+2026-04-02 13:41:18,694 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:41:18,694 - socket_live_data.floorsheet_client - INFO - Requesting route CompanyDetails (messageId=1)
+2026-04-02 13:41:18,730 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:41:42,391 - __main__ - INFO - Testing WebSocket connection...
+2026-04-02 13:41:44,446 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:41:44,452 - socket_live_data.floorsheet_client - INFO - Disconnected from server
+2026-04-02 13:41:54,571 - __main__ - INFO - Testing WebSocket connection...
+2026-04-02 13:41:56,627 - socket_live_data.floorsheet_client - INFO - Connected to ws://localhost:5555
+2026-04-02 13:41:56,627 - __main__ - INFO - [OK] Successfully connected to WebSocket server
+2026-04-02 13:41:56,628 - socket_live_data.floorsheet_client - INFO - Disconnected from server

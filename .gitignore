@@ -1,0 +1,15 @@
+.*
+__*
+!__init__.py
+!__main__.py
+!.gitignore
+!.github/
+build/
+nepse.egg-info/
+.vercel
+venv/
+.venv/
+output/
+broker_tracker_reports/
+*.sql
+

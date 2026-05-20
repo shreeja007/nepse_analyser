@@ -1,0 +1,17 @@
+fastapi==0.115.14
+nepse @ git+https://github.com/basic-bgnr/NepseUnofficialApi.git@dev #dev branch
+#nepse @ git+https://github.com/surajrimal07/NepseUnofficialApi.git  #@master
+uvicorn==0.34.0
+websockets==14.1
+uvloop; sys_platform != 'win32'  # Install uvloop only on non-Windows platforms
+httptools>=0.6.4
+
+# MCP Server dependencies
+fastmcp==2.10.1
+
+# Data collection dependencies
+python-dotenv>=1.0.0
+aiomysql>=0.2.0
+pymysql>=1.1.0
+httpx>=0.27.0
+pandas>=2.0.0
