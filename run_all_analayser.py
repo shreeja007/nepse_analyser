@@ -29,18 +29,22 @@ def main() -> int:
     print(f"  Commands to run: {len(COMMANDS)}\n")
 
     for label, cmd in COMMANDS:
-        print(f"Starting: {label}")
-        start = time.time()
-        proc = subprocess.Popen(cmd, cwd=sys.path[0] or ".")
-        processes.append((label, proc, start))
+        print(f"  Starting: {label}")
+        p = subprocess.Popen(
+            cmd,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            cwd=sys.path[0] or ".",
+        )
+        processes.append((label, p, time.time()))
+
+    print("\n  Waiting for all processes to finish...\n")
 
     results = []
-    for label, proc, start in processes:
-        rc = proc.wait()
-        elapsed = time.time() - start
-        status = "\u2713 OK" if rc == 0 else "\u2717 FAILED"
+    for label, p, start_time in processes:
+        rc = p.wait()
+        elapsed = time.time() - start_time
         results.append((label, rc, elapsed))
-        print(f"  {label}: {status} ({elapsed:.1f}s)")
 
     total_elapsed = time.time() - total_start
     passed = sum(1 for _, rc, _ in results if rc == 0)

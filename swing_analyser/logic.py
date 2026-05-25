@@ -1,3 +1,5 @@
+import concurrent.futures
+import multiprocessing
 """
 NEPSE Swing Trading Analyser — Logic Module (v1.0)
 
@@ -1162,13 +1164,274 @@ def _calc_sector_breadth(analysis_results, all_details, all_securities):
 #  MAIN ORCHESTRATOR
 # ═══════════════════════════════════════════════════════════════════════
 
+import concurrent.futures
+import multiprocessing
+
+_worker_state = {}
+
+def _init_worker(all_corps, all_divs, all_details, all_securities, all_52w, all_live, all_fund, broker_scores, regime, equity):
+    global _worker_state
+    _worker_state['corps'] = all_corps
+    _worker_state['divs'] = all_divs
+    _worker_state['details'] = all_details
+    _worker_state['securities'] = all_securities
+    _worker_state['snapshots'] = all_52w
+    _worker_state['live'] = all_live
+    _worker_state['fund'] = all_fund
+    _worker_state['broker_scores'] = broker_scores
+    _worker_state['regime'] = regime
+    _worker_state['equity'] = equity
+
+def _process_single_symbol(sym, raw_candles, min_avg_volume):
+    global _worker_state
+    all_corps = _worker_state['corps']
+    all_divs = _worker_state['divs']
+    all_details = _worker_state['details']
+    all_securities = _worker_state['securities']
+    all_52w = _worker_state['snapshots']
+    all_live = _worker_state['live']
+    all_fund = _worker_state['fund']
+    broker_scores = _worker_state['broker_scores']
+    regime = _worker_state['regime']
+    equity = _worker_state['equity']
+
+    skip_stats = {
+        "insufficient_bars": 0,
+        "liquidity_filtered": 0,
+        "circuit_filtered": 0,
+        "stale_forward_fill": 0,
+        "sma200_filtered": 0,
+        "atr_filtered": 0,
+        "no_setup": 0,
+    }
+    
+    analysis_res = None
+    candidate_res = None
+
+    try:
+        live_row = all_live.get(sym)
+        bridged = bridge_live_candle(raw_candles, live_row)
+        candles = get_adjusted_series(bridged, all_corps.get(sym, []), all_divs.get(sym, []))
+        candles = forward_fill_zero_volume_days(candles)
+        max_fill_streak = _max_forward_fill_streak(candles)
+
+        if len(candles) < MIN_DATA_BARS:
+            skip_stats["insufficient_bars"] += 1
+            return sym, analysis_res, candidate_res, skip_stats, None
+
+        if max_fill_streak > MAX_FORWARD_FILL_STREAK:
+            skip_stats["stale_forward_fill"] += 1
+            return sym, analysis_res, candidate_res, skip_stats, None
+
+        closes = [float(c["close_price"]) for c in candles]
+        volumes = [int(c.get("volume") or 0) for c in candles]
+
+        if live_row and float(live_row.get("last_traded_price") or 0) > 0:
+            price = float(live_row["last_traded_price"])
+        else:
+            price = closes[-1]
+        if price <= 0:
+            return sym, analysis_res, candidate_res, skip_stats, None
+
+        if is_low_liquidity(candles, min_avg_volume):
+            skip_stats["liquidity_filtered"] += 1
+            return sym, analysis_res, candidate_res, skip_stats, None
+        if is_circuit_volatile(candles):
+            skip_stats["circuit_filtered"] += 1
+            return sym, analysis_res, candidate_res, skip_stats, None
+
+        weekly = resample_to_weekly(candles)
+
+        sma20 = calc_sma(closes, 20)
+        sma50 = calc_sma(closes, 50)
+        sma200 = calc_sma(closes, 200)
+        rsi = calc_rsi(closes)
+        macd_val, sig_val, macd_hist, macd_line = calc_macd(closes)
+        atr = calc_circuit_adjusted_atr(candles)
+        if atr is None:
+            atr = calc_atr(candles)
+        stoch_k, stoch_d = calc_stochastic(candles)
+        obv_trend = calc_obv_trend(closes, volumes)
+        bb_upper, bb_middle, bb_lower = calc_bollinger_bands(closes)
+        bb_squeeze = is_bollinger_squeeze(bb_upper, bb_middle, bb_lower)
+        adx = calc_adx(candles)
+        roc_20 = calc_roc(closes, 20)
+        roc_60 = calc_roc(closes, 60) if len(closes) > 61 else None
+        patterns = detect_candlestick_patterns(candles)
+
+        vol_avg = sum(volumes[-20:]) / min(len(volumes[-20:]), 20) if volumes else 0
+        vol_ratio = round(volumes[-1] / vol_avg, 2) if vol_avg > 0 else 0
+
+        bb_pct = None
+        if bb_upper and bb_lower and bb_upper != bb_lower:
+            bb_pct = round((price - bb_lower) / (bb_upper - bb_lower) * 100, 1)
+
+        macd_just_bullish = check_macd_bullish_crossover(macd_line)
+        cross = check_ma_crossover(closes, sma20, sma50)
+
+        det = all_details.get(sym, {})
+        snap52 = all_52w.get(sym, {})
+        _snap_hi = float(snap52.get("hi52") or 0)
+        _det_hi = float(det.get("fifty_two_week_high") or 0)
+        _calc_hi = max(closes[-252:]) if len(closes) >= 252 else max(closes)
+        hi52 = _snap_hi or _det_hi or _calc_hi
+        _snap_lo = float(snap52.get("lo52") or 0)
+        _det_lo = float(det.get("fifty_two_week_low") or 0)
+        _calc_lo = min(closes[-252:]) if len(closes) >= 252 else min(closes)
+        lo52 = _snap_lo or _det_lo or _calc_lo
+
+        sector = (det.get("sector_name") or all_securities.get(sym, {}).get("sector_name") or "")
+        broker_asym = broker_scores.get(sym, 50)
+        if vol_avg < MIN_BROKER_LIQ_VOLUME:
+            broker_asym = 50
+
+        near_52w_low = lo52 > 0 and price <= lo52 * 1.05
+        if sma200 and price < sma200:
+            if not (rsi is not None and rsi < 30 and near_52w_low):
+                skip_stats["sma200_filtered"] += 1
+                analysis_res = {
+                    "symbol": sym, "sector": sector, "price": price,
+                    "sma50": sma50, "sma200": sma200,
+                }
+                return sym, analysis_res, candidate_res, skip_stats, None
+
+        if atr and price > 0 and (atr / price * 100) > MAX_ATR_PCT:
+            skip_stats["atr_filtered"] += 1
+            analysis_res = {
+                "symbol": sym, "sector": sector, "price": price,
+                "sma50": sma50, "sma200": sma200,
+            }
+            return sym, analysis_res, candidate_res, skip_stats, None
+
+        w_closes = [float(w["close_price"]) for w in weekly] if weekly else []
+        w_sma10 = calc_sma(w_closes, 10) if len(w_closes) >= 10 else None
+        weekly_uptrend = w_sma10 is not None and price > w_sma10
+        w_rsi = calc_rsi(w_closes) if len(w_closes) >= 15 else None
+
+        setups = _detect_swing_setups(
+            price=price, candles=candles,
+            weekly_uptrend=weekly_uptrend, w_rsi=w_rsi,
+            sma20=sma20, sma50=sma50,
+            rsi=rsi, macd_hist=macd_hist, macd_just_bullish=macd_just_bullish,
+            adx=adx, bb_squeeze=bb_squeeze,
+            stoch_k=stoch_k, stoch_d=stoch_d,
+            obv_trend=obv_trend, vol_ratio=vol_ratio,
+            lo52=lo52,
+            patterns=patterns, broker_asym=broker_asym, cross=cross,
+        )
+
+        if not setups:
+            skip_stats["no_setup"] += 1
+            analysis_res = {
+                "symbol": sym, "sector": sector, "price": price,
+                "sma50": sma50, "sma200": sma200,
+            }
+            return sym, analysis_res, candidate_res, skip_stats, None
+
+        best_setup = max(setups, key=lambda s: s["confidence"])
+        confluence_bonus = min(10, max(0, len(setups) - 1) * 4)
+        setup_conf = min(100, best_setup["confidence"] + confluence_bonus)
+        fund_data = all_fund.get(sym, {})
+        fundamental_stale = _is_fundamental_stale(fund_data)
+
+        high_prox = round((hi52 - price) / hi52 * 100, 1) if hi52 > 0 else 100
+        scores = _calc_swing_composite(
+            price=price, sma20=sma20, sma50=sma50, sma200=sma200,
+            rsi=rsi, macd_hist=macd_hist, macd_just_bullish=macd_just_bullish,
+            vol_ratio=vol_ratio, obv_trend=obv_trend, adx=adx,
+            cross=cross, bb_pct=bb_pct,
+            setup_conf=setup_conf,
+            atr=atr, hi52=hi52, lo52=lo52,
+            broker_asym=broker_asym,
+            fund=fund_data,
+            weekly_uptrend=weekly_uptrend,
+            roc_20=roc_20, roc_60=roc_60, high_prox=high_prox,
+        )
+
+        composite = scores["composite"] * regime.get("factor", 1.0) + seasonality_adj()
+        if fundamental_stale:
+            composite -= 3
+        composite = max(0, min(100, composite))
+        scores["composite"] = round(composite, 2)
+
+        signal = _classify_signal(composite, setup_conf)
+
+        stop_distance = max((ATR_SL_MULT * atr) if atr else 0.0, price * 0.03)
+        stop_loss = round(price - stop_distance, 2) if stop_distance > 0 else round(price * 0.92, 2)
+        stop_loss = max(0.01, stop_loss)
+        target_1 = round(price + ATR_T1_MULT * atr, 2) if atr else round(price * 1.08, 2)
+        target_2 = round(price + ATR_T2_MULT * atr, 2) if atr else round(price * 1.15, 2)
+        risk_per_share = abs(price - stop_loss)
+        rr_ratio = round((target_1 - price) / risk_per_share, 1) if risk_per_share > 0 else 0
+        pos_size = 0
+        if risk_per_share > 0 and price > 0:
+            raw_size = max(1, int(equity * RISK_PCT / risk_per_share))
+            max_by_capital = max(1, int(equity / price))
+            max_by_liquidity = max(1, int(vol_avg * MAX_POSITION_SHARE_OF_AVG_VOL)) if vol_avg > 0 else raw_size
+            max_by_allocation = max(1, int((equity * MAX_CAPITAL_ALLOCATION_PCT) / price))
+            pos_size = max(1, min(raw_size, max_by_capital, max_by_liquidity, max_by_allocation))
+
+        entry_zone = _calc_entry_zone(price, atr, best_setup["setup_type"])
+        data_confidence = _compute_data_confidence(
+            bars=len(candles),
+            avg_volume=vol_avg,
+            circuit_volatile=False,
+            fundamental_stale=fundamental_stale,
+            has_live_price=bool(live_row and float(live_row.get("last_traded_price") or 0) > 0),
+            excessive_forward_fill=max_fill_streak > MAX_FORWARD_FILL_STREAK,
+        )
+
+        analysis_res = {
+            "symbol": sym, "sector": sector, "price": price,
+            "setup_type": best_setup["setup_type"],
+            "setup_reasoning": best_setup["reasoning"],
+            "all_setups": setups,
+            "confidence": setup_conf,
+            "signal": signal,
+            "entry_zone": entry_zone,
+            "stop_loss": stop_loss,
+            "target_1": target_1,
+            "target_2": target_2,
+            "rr_ratio": rr_ratio,
+            "position_size": pos_size,
+            "hold_period": _est_hold_period(best_setup["setup_type"]),
+            "sma20": sma20, "sma50": sma50, "sma200": sma200,
+            "rsi": rsi, "macd_hist": macd_hist,
+            "macd_just_bullish": macd_just_bullish,
+            "atr": atr, "adx": adx,
+            "stoch_k": stoch_k, "stoch_d": stoch_d,
+            "obv_trend": obv_trend, "vol_ratio": vol_ratio,
+            "bb_upper": bb_upper, "bb_lower": bb_lower,
+            "bb_pct": bb_pct, "bb_squeeze": bb_squeeze,
+            "cross": cross, "patterns": patterns,
+            "roc_20": roc_20, "roc_60": roc_60,
+            "hi52": hi52, "lo52": lo52, "high_prox": high_prox,
+            "weekly_uptrend": weekly_uptrend,
+            "broker_asym": broker_asym,
+            "data_confidence": data_confidence,
+            "max_forward_fill_streak": max_fill_streak,
+            "fundamental_stale": fundamental_stale,
+            "eps": float(fund_data.get("eps") or 0),
+            "pe": float(fund_data.get("pe_ratio") or 0),
+            "book_value": float(fund_data.get("book_value") or 0),
+            **scores,
+        }
+        
+        if signal in ("BUY", "STRONG BUY") and rr_ratio >= MIN_RR_RATIO:
+            candidate_res = analysis_res
+            
+        return sym, analysis_res, candidate_res, skip_stats, None
+
+    except Exception as e:
+        return sym, None, None, skip_stats, str(e)
+
+
 def run_swing_analysis(top_n=15, min_avg_volume=5000, account_equity=None):
-    """Execute the full swing analysis pipeline."""
+    """Execute the full swing analysis pipeline using multiprocessing."""
     equity = account_equity or ACCOUNT_EQUITY
     print(f"\n  📊 Starting swing analysis pipeline (equity: Rs {equity:,.0f})...\n")
     conn = get_conn()
     try:
-        # ── Batch fetch ──
         all_ohlcv = fetch_all_ohlcv(conn)
         all_corps = fetch_all_corp_actions(conn)
         all_divs = fetch_all_dividends(conn)
@@ -1183,12 +1446,11 @@ def run_swing_analysis(top_n=15, min_avg_volume=5000, account_equity=None):
         total_universe = len(all_ohlcv)
 
         print(f"  Market regime: {regime['regime']} (NEPSE {regime['chg']:+.2f}%)")
-
-        # ── Per-symbol analysis ──
-        print(f"  [engine] Analyzing {len(all_ohlcv)} symbols for swing setups...")
+        print(f"  [engine] Analyzing {total_universe} symbols for swing setups...")
+        
         analysis_results = {}
         swing_candidates = []
-        errors = {}  # Track per-symbol errors instead of silent swallow
+        errors = {}
         processed_symbols = 0
         diagnostics = {
             "insufficient_bars": 0,
@@ -1200,261 +1462,40 @@ def run_swing_analysis(top_n=15, min_avg_volume=5000, account_equity=None):
             "no_setup": 0,
         }
 
-        for sym, raw_candles in all_ohlcv.items():
-            processed_symbols += 1
-            try:
-                # Data pipeline
-                live_row = all_live.get(sym)
-                bridged = bridge_live_candle(raw_candles, live_row)
-                candles = get_adjusted_series(bridged, all_corps.get(sym, []), all_divs.get(sym, []))
-                candles = forward_fill_zero_volume_days(candles)
-                max_fill_streak = _max_forward_fill_streak(candles)
+        max_workers = max(1, multiprocessing.cpu_count() // 5)
+        init_args = (all_corps, all_divs, all_details, all_securities, all_52w, all_live, all_fund, broker_scores, regime, equity)
+        
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, initializer=_init_worker, initargs=init_args) as executor:
+            futures = [
+                executor.submit(_process_single_symbol, sym, raw_candles, min_avg_volume)
+                for sym, raw_candles in all_ohlcv.items()
+            ]
+            
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    sym, analysis_res, candidate_res, skips, err = future.result()
+                    processed_symbols += 1
+                    
+                    for k, v in skips.items():
+                        diagnostics[k] += v
+                    if err:
+                        errors[sym] = err
+                    if analysis_res:
+                        analysis_results[sym] = analysis_res
+                    if candidate_res:
+                        swing_candidates.append(candidate_res)
+                except Exception as e:
+                    print(f"Executor error: {e}")
 
-                if len(candles) < MIN_DATA_BARS:
-                    diagnostics["insufficient_bars"] += 1
-                    continue
-
-                if max_fill_streak > MAX_FORWARD_FILL_STREAK:
-                    diagnostics["stale_forward_fill"] += 1
-                    continue
-
-                closes = [float(c["close_price"]) for c in candles]
-                volumes = [int(c.get("volume") or 0) for c in candles]
-
-                # Live price
-                if live_row and float(live_row.get("last_traded_price") or 0) > 0:
-                    price = float(live_row["last_traded_price"])
-                else:
-                    price = closes[-1]
-                if price <= 0:
-                    continue
-
-                # Filters — early exit
-                if is_low_liquidity(candles, min_avg_volume):
-                    diagnostics["liquidity_filtered"] += 1
-                    continue
-                if is_circuit_volatile(candles):
-                    diagnostics["circuit_filtered"] += 1
-                    continue
-
-                # Weekly resample
-                weekly = resample_to_weekly(candles)
-
-                # Daily indicators
-                sma20 = calc_sma(closes, 20)
-                sma50 = calc_sma(closes, 50)
-                sma200 = calc_sma(closes, 200)
-                rsi = calc_rsi(closes)
-                macd_val, sig_val, macd_hist, macd_line = calc_macd(closes)
-                atr = calc_circuit_adjusted_atr(candles)
-                if atr is None:
-                    atr = calc_atr(candles)
-                stoch_k, stoch_d = calc_stochastic(candles)
-                obv_trend = calc_obv_trend(closes, volumes)
-                bb_upper, bb_middle, bb_lower = calc_bollinger_bands(closes)
-                bb_squeeze = is_bollinger_squeeze(bb_upper, bb_middle, bb_lower)
-                adx = calc_adx(candles)
-                roc_20 = calc_roc(closes, 20)
-                roc_60 = calc_roc(closes, 60) if len(closes) > 61 else None
-                patterns = detect_candlestick_patterns(candles)
-
-                vol_avg = sum(volumes[-20:]) / min(len(volumes[-20:]), 20) if volumes else 0
-                vol_ratio = round(volumes[-1] / vol_avg, 2) if vol_avg > 0 else 0
-
-                bb_pct = None
-                if bb_upper and bb_lower and bb_upper != bb_lower:
-                    bb_pct = round((price - bb_lower) / (bb_upper - bb_lower) * 100, 1)
-
-                # MACD crossover detection
-                macd_just_bullish = check_macd_bullish_crossover(macd_line)
-
-                # MA crossover
-                cross = check_ma_crossover(closes, sma20, sma50)
-
-                # 52W data — fixed operator precedence (bug #1)
-                det = all_details.get(sym, {})
-                snap52 = all_52w.get(sym, {})
-                _snap_hi = float(snap52.get("hi52") or 0)
-                _det_hi = float(det.get("fifty_two_week_high") or 0)
-                _calc_hi = max(closes[-252:]) if len(closes) >= 252 else max(closes)
-                hi52 = _snap_hi or _det_hi or _calc_hi
-                _snap_lo = float(snap52.get("lo52") or 0)
-                _det_lo = float(det.get("fifty_two_week_low") or 0)
-                _calc_lo = min(closes[-252:]) if len(closes) >= 252 else min(closes)
-                lo52 = _snap_lo or _det_lo or _calc_lo
-
-                sector = (det.get("sector_name")
-                          or all_securities.get(sym, {}).get("sector_name") or "")
-                broker_asym = broker_scores.get(sym, 50)
-                if vol_avg < MIN_BROKER_LIQ_VOLUME:
-                    broker_asym = 50
-
-                # ── SMA200 trend filter (with carve-out for OVERSOLD_REVERSAL) ──
-                near_52w_low = lo52 > 0 and price <= lo52 * 1.05
-                if sma200 and price < sma200:
-                    # Allow potential oversold reversals through
-                    if not (rsi is not None and rsi < 30 and near_52w_low):
-                        diagnostics["sma200_filtered"] += 1
-                        analysis_results[sym] = {
-                            "symbol": sym, "sector": sector, "price": price,
-                            "sma50": sma50, "sma200": sma200,
-                        }
-                        continue
-
-                # ATR % filter
-                if atr and price > 0 and (atr / price * 100) > MAX_ATR_PCT:
-                    diagnostics["atr_filtered"] += 1
-                    analysis_results[sym] = {
-                        "symbol": sym, "sector": sector, "price": price,
-                        "sma50": sma50, "sma200": sma200,
-                    }
-                    continue
-
-                # Weekly uptrend check (computed once, passed to both detector & scorer)
-                w_closes = [float(w["close_price"]) for w in weekly] if weekly else []
-                w_sma10 = calc_sma(w_closes, 10) if len(w_closes) >= 10 else None
-                weekly_uptrend = w_sma10 is not None and price > w_sma10
-                w_rsi = calc_rsi(w_closes) if len(w_closes) >= 15 else None
-
-                # ── Detect swing setups ──
-                setups = _detect_swing_setups(
-                    price=price, candles=candles,
-                    weekly_uptrend=weekly_uptrend, w_rsi=w_rsi,
-                    sma20=sma20, sma50=sma50,
-                    rsi=rsi, macd_hist=macd_hist, macd_just_bullish=macd_just_bullish,
-                    adx=adx, bb_squeeze=bb_squeeze,
-                    stoch_k=stoch_k, stoch_d=stoch_d,
-                    obv_trend=obv_trend, vol_ratio=vol_ratio,
-                    lo52=lo52,
-                    patterns=patterns, broker_asym=broker_asym, cross=cross,
-                )
-
-                if not setups:
-                    diagnostics["no_setup"] += 1
-                    analysis_results[sym] = {
-                        "symbol": sym, "sector": sector, "price": price,
-                        "sma50": sma50, "sma200": sma200,
-                    }
-                    continue
-
-                # Pick best setup
-                best_setup = max(setups, key=lambda s: s["confidence"])
-                confluence_bonus = min(10, max(0, len(setups) - 1) * 4)
-                setup_conf = min(100, best_setup["confidence"] + confluence_bonus)
-                fund_data = all_fund.get(sym, {})
-                fundamental_stale = _is_fundamental_stale(fund_data)
-
-                # Composite scoring
-                high_prox = round((hi52 - price) / hi52 * 100, 1) if hi52 > 0 else 100
-                scores = _calc_swing_composite(
-                    price=price, sma20=sma20, sma50=sma50, sma200=sma200,
-                    rsi=rsi, macd_hist=macd_hist, macd_just_bullish=macd_just_bullish,
-                    vol_ratio=vol_ratio, obv_trend=obv_trend, adx=adx,
-                    cross=cross, bb_pct=bb_pct,
-                    setup_conf=setup_conf,
-                    atr=atr, hi52=hi52, lo52=lo52,
-                    broker_asym=broker_asym,
-                    fund=fund_data,
-                    weekly_uptrend=weekly_uptrend,
-                    roc_20=roc_20, roc_60=roc_60, high_prox=high_prox,
-                )
-
-                # Apply market regime & seasonality
-                composite = scores["composite"] * regime.get("factor", 1.0) + seasonality_adj()
-                if fundamental_stale:
-                    composite -= 3
-                composite = max(0, min(100, composite))
-                scores["composite"] = round(composite, 2)
-
-                signal = _classify_signal(composite, setup_conf)
-
-                # Risk management
-                stop_distance = max((ATR_SL_MULT * atr) if atr else 0.0, price * 0.03)
-                stop_loss = round(price - stop_distance, 2) if stop_distance > 0 else round(price * 0.92, 2)
-                stop_loss = max(0.01, stop_loss)
-                target_1 = round(price + ATR_T1_MULT * atr, 2) if atr else round(price * 1.08, 2)
-                target_2 = round(price + ATR_T2_MULT * atr, 2) if atr else round(price * 1.15, 2)
-                risk_per_share = abs(price - stop_loss)
-                rr_ratio = round((target_1 - price) / risk_per_share, 1) if risk_per_share > 0 else 0
-                pos_size = 0
-                if risk_per_share > 0 and price > 0:
-                    raw_size = max(1, int(equity * RISK_PCT / risk_per_share))
-                    max_by_capital = max(1, int(equity / price))
-                    max_by_liquidity = max(1, int(vol_avg * MAX_POSITION_SHARE_OF_AVG_VOL)) if vol_avg > 0 else raw_size
-                    max_by_allocation = max(1, int((equity * MAX_CAPITAL_ALLOCATION_PCT) / price))
-                    pos_size = max(1, min(raw_size, max_by_capital, max_by_liquidity, max_by_allocation))
-                # high_prox already computed above for composite scoring
-                entry_zone = _calc_entry_zone(price, atr, best_setup["setup_type"])
-                data_confidence = _compute_data_confidence(
-                    bars=len(candles),
-                    avg_volume=vol_avg,
-                    circuit_volatile=False,
-                    fundamental_stale=fundamental_stale,
-                    has_live_price=bool(live_row and float(live_row.get("last_traded_price") or 0) > 0),
-                    excessive_forward_fill=max_fill_streak > MAX_FORWARD_FILL_STREAK,
-                )
-
-                result = {
-                    "symbol": sym, "sector": sector, "price": price,
-                    "setup_type": best_setup["setup_type"],
-                    "setup_reasoning": best_setup["reasoning"],
-                    "all_setups": setups,
-                    "confidence": setup_conf,
-                    "signal": signal,
-                    "entry_zone": entry_zone,
-                    "stop_loss": stop_loss,
-                    "target_1": target_1,
-                    "target_2": target_2,
-                    "rr_ratio": rr_ratio,
-                    "position_size": pos_size,
-                    "hold_period": _est_hold_period(best_setup["setup_type"]),
-                    # Indicators
-                    "sma20": sma20, "sma50": sma50, "sma200": sma200,
-                    "rsi": rsi, "macd_hist": macd_hist,
-                    "macd_just_bullish": macd_just_bullish,
-                    "atr": atr, "adx": adx,
-                    "stoch_k": stoch_k, "stoch_d": stoch_d,
-                    "obv_trend": obv_trend, "vol_ratio": vol_ratio,
-                    "bb_upper": bb_upper, "bb_lower": bb_lower,
-                    "bb_pct": bb_pct, "bb_squeeze": bb_squeeze,
-                    "cross": cross, "patterns": patterns,
-                    "roc_20": roc_20, "roc_60": roc_60,
-                    "hi52": hi52, "lo52": lo52, "high_prox": high_prox,
-                    "weekly_uptrend": weekly_uptrend,
-                    "broker_asym": broker_asym,
-                    "data_confidence": data_confidence,
-                    "max_forward_fill_streak": max_fill_streak,
-                    "fundamental_stale": fundamental_stale,
-                    # Fundamentals
-                    "eps": float(fund_data.get("eps") or 0),
-                    "pe": float(fund_data.get("pe_ratio") or 0),
-                    "book_value": float(fund_data.get("book_value") or 0),
-                    # Scores
-                    **scores,
-                }
-
-                analysis_results[sym] = result
-
-                if signal in ("BUY", "STRONG BUY") and rr_ratio >= MIN_RR_RATIO:
-                    swing_candidates.append(result)
-
-            except Exception as e:
-                errors[sym] = str(e)
-                continue
-
-        # ── Rank & filter ──
         swing_candidates.sort(key=lambda x: x["composite"], reverse=True)
         watchlist = swing_candidates[:top_n]
 
-        # Sector breadth
         sector_breadth = _calc_sector_breadth(analysis_results, all_details, all_securities)
 
-        # Setup distribution
         setup_dist = defaultdict(int)
         for c in swing_candidates:
             setup_dist[c["setup_type"]] += 1
 
-        # Near-misses (rejected but close) — set-based O(1) lookup
         all_with_setups = [v for v in analysis_results.values() if "setup_type" in v]
         wl_syms = {c["symbol"] for c in swing_candidates}
         rejected = [r for r in all_with_setups if r["symbol"] not in wl_syms]
@@ -1494,3 +1535,5 @@ def run_swing_analysis(top_n=15, min_avg_volume=5000, account_equity=None):
     finally:
         conn.close()
         print("  🔌 Database connection closed.")
+
+

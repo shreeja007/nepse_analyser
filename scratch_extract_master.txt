@@ -1,0 +1,653 @@
+def _build_universe(
+    *,
+    all_ohlcv: dict[str, list[dict[str, Any]]],
+    all_corps: dict[str, list[dict[str, Any]]],
+    all_divs: dict[str, list[dict[str, Any]]],
+    all_details: dict[str, dict[str, Any]],
+    all_securities: dict[str, dict[str, Any]],
+    all_52w: dict[str, dict[str, Any]],
+    all_live: dict[str, dict[str, Any]],
+    all_fund: dict[str, dict[str, Any]],
+    broker_scores: dict[str, float],
+    vwap_map: dict[str, float],
+    turnover_rank_map: dict[str, dict[str, float]],
+    top_mover_streaks: dict[str, int],
+    sector_pe_avg: dict[str, float],
+    nepse_values: list[float],
+    leaders: list[str],
+    laggards: list[str],
+    book_closure_map: dict[str, dict[str, Any]],
+    wabr_map: dict[str, float],
+    broker_flow_map: dict[str, dict[str, Any]],
+    broker_intel_map: dict[str, dict[str, Any]],
+    broker_consistency: dict[str, int],
+    floorsheet_days: int,
+    market_regime_factor: float,
+    data_date: date,
+    equity: int | None,
+    quick: bool,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, int]]:
+    has_consistency_window = floorsheet_days >= 4
+    min_sessions = max(2, (floorsheet_days + 1) // 2) if has_consistency_window else 2
+    normalized_market_regime_factor = max(0.85, min(1.15, _safe_float(market_regime_factor, 1.0)))
+    trading_mode = _is_trading_mode(equity)
+    ranked: list[dict[str, Any]] = []
+    diagnostics = {
+        "total_symbols": len(all_ohlcv),
+        "processed": 0,
+        "ranked": 0,
+        "skipped_short_history": 0,
+        "skipped_bad_price": 0,
+        "skipped_low_liquidity": 0,
+        "skipped_circuit_volatile": 0,
+        "skipped_errors": 0,
+    }
+
+    for sym, raw_candles in all_ohlcv.items():
+        try:
+            live_row = all_live.get(sym)
+            bridged = bridge_live_candle(raw_candles, live_row)
+            candles = get_adjusted_series(bridged, all_corps.get(sym, []), all_divs.get(sym, []))
+            candles = forward_fill_zero_volume_days(candles)
+            if len(candles) < MIN_DATA_BARS:
+                diagnostics["skipped_short_history"] += 1
+                continue
+
+            closes = [_safe_float(c["close_price"]) for c in candles]
+            volumes = [int(c.get("volume") or 0) for c in candles]
+            has_live_price = bool(live_row and _safe_float(live_row.get("last_traded_price")) > 0)
+            if has_live_price:
+                price = _safe_float(live_row.get("last_traded_price"))
+            else:
+                price = closes[-1]
+            if price <= 0:
+                diagnostics["skipped_bad_price"] += 1
+                continue
+
+            vol_window = volumes[-20:]
+            avg_volume = sum(vol_window) / len(vol_window) if vol_window else 0
+            if avg_volume < LOW_LIQ_THRESH:
+                diagnostics["skipped_low_liquidity"] += 1
+                continue
+
+            sma20 = calc_sma(closes, 20)
+            sma50 = calc_sma(closes, 50)
+            sma200 = calc_sma(closes, 200)
+            rsi = calc_rsi(closes)
+            macd_val, sig_val, macd_hist, macd_line = calc_macd(closes)
+            macd_just_bullish = check_macd_bullish_crossover(macd_line)
+            macd_just_bearish = _check_macd_bearish_crossover(macd_line)
+            circuit_volatile = bool(is_circuit_volatile(candles))
+            if circuit_volatile:
+                diagnostics["skipped_circuit_volatile"] += 1
+                continue
+            atr = _calc_circuit_adjusted_atr(candles)
+            if atr is None:
+                atr = calc_atr(candles)
+            stoch_k, stoch_d = calc_stochastic(candles)
+            obv_trend = calc_obv_trend(closes, volumes)
+            vpt_bearish_div = _detect_vpt_bearish_divergence(closes, volumes, window=20)
+            bb_upper, bb_middle, bb_lower = calc_bollinger_bands(closes)
+            bb_squeeze = is_bollinger_squeeze(bb_upper, bb_middle, bb_lower)
+            adx = calc_adx(candles)
+            roc_20 = calc_roc(closes, 20)
+            roc_60 = calc_roc(closes, 60) if len(closes) > 61 else None
+            patterns = detect_candlestick_patterns(candles)
+            cross = check_ma_crossover(closes, sma20, sma50)
+            weekly = resample_to_weekly(candles)
+            w_closes = [_safe_float(w["close_price"]) for w in weekly]
+            w_sma10 = calc_sma(w_closes, 10) if len(w_closes) >= 10 else None
+            weekly_uptrend = bool(w_sma10 is not None and price > w_sma10)
+            w_rsi = calc_rsi(w_closes) if len(w_closes) >= 15 else None
+
+            det = all_details.get(sym, {})
+            sec = all_securities.get(sym, {})
+            snap52 = all_52w.get(sym, {})
+            hi52 = (
+                _safe_float(snap52.get("hi52"))
+                or _safe_float(det.get("fifty_two_week_high"))
+                or max(closes[-252:] if len(closes) >= 252 else closes)
+            )
+            lo52 = (
+                _safe_float(snap52.get("lo52"))
+                or _safe_float(det.get("fifty_two_week_low"))
+                or min(closes[-252:] if len(closes) >= 252 else closes)
+            )
+            high_prox = round((hi52 - price) / hi52 * 100.0, 2) if hi52 > 0 else 100.0
+
+            vol_ratio = round(volumes[-1] / avg_volume, 2) if avg_volume > 0 else 0.0
+            bb_pct = None
+            if bb_upper and bb_lower and bb_upper != bb_lower:
+                bb_pct = round((price - bb_lower) / (bb_upper - bb_lower) * 100.0, 1)
+
+            sector = det.get("sector_name") or sec.get("sector_name") or "Other"
+            broker_asym = _safe_float(broker_scores.get(sym, 50))
+            flow = broker_flow_map.get(sym, {})
+            broker_intel = broker_intel_map.get(sym, {})
+            fund = all_fund.get(sym, {})
+            fundamental_stale = _is_fundamental_stale(fund)
+            max_fill_streak = _max_forward_fill_streak(candles)
+            excessive_forward_fill = max_fill_streak > MAX_FORWARD_FILL_STREAK
+            has_synthetic_open = any(_safe_int(c.get("is_synthetic_open")) > 0 for c in candles[-3:])
+            latest_symbol_date = _coerce_to_date(candles[-1].get("trading_date"))
+            freshness_days = (data_date - latest_symbol_date).days if latest_symbol_date else MAX_ALLOWED_FRESHNESS_DAYS + 1
+            freshness_days = max(0, freshness_days)
+            data_confidence = _compute_data_confidence(
+                bars=len(candles),
+                avg_volume=avg_volume,
+                circuit_volatile=circuit_volatile,
+                fundamental_stale=fundamental_stale,
+                has_live_price=has_live_price,
+                excessive_forward_fill=excessive_forward_fill,
+            )
+            setups = _detect_swing_setups(
+                price=price,
+                candles=candles,
+                weekly_uptrend=weekly_uptrend,
+                w_rsi=w_rsi,
+                sma20=sma20,
+                sma50=sma50,
+                rsi=rsi,
+                macd_hist=macd_hist,
+                macd_just_bullish=macd_just_bullish,
+                adx=adx,
+                bb_squeeze=bb_squeeze,
+                stoch_k=stoch_k,
+                stoch_d=stoch_d,
+                obv_trend=obv_trend,
+                vol_ratio=vol_ratio,
+                lo52=lo52,
+                patterns=patterns,
+                broker_asym=broker_asym,
+                cross=cross,
+            )
+            best_setup = max(setups, key=lambda s: s["confidence"]) if setups else None
+
+            scores = calc_universal_score(
+                price=price,
+                sma20=sma20,
+                sma50=sma50,
+                sma200=sma200,
+                rsi=rsi,
+                macd_hist=macd_hist,
+                macd_just_bullish=macd_just_bullish,
+                vol_ratio=vol_ratio,
+                obv_trend=obv_trend,
+                adx=adx,
+                cross=cross,
+                bb_pct=bb_pct,
+                atr=atr,
+                hi52=hi52,
+                lo52=lo52,
+                high_prox=high_prox,
+                broker_asym=broker_asym,
+                fund=fund,
+                fundamental_stale=fundamental_stale,
+                weekly_uptrend=weekly_uptrend,
+                w_rsi=w_rsi,
+                roc_20=roc_20,
+                roc_60=roc_60,
+                setup_conf=best_setup["confidence"] if best_setup else 0,
+                has_setup=bool(best_setup),
+                avg_volume=avg_volume,
+                circuit_volatile=circuit_volatile,
+            )
+
+            rs_delta, rs_bonus, rs_score = _compute_rs_delta(closes, nepse_values)
+            sector_bonus, sector_state = _sector_leadership_bonus(sector, leaders, laggards)
+            turnover_info = turnover_rank_map.get(sym, {})
+            turnover_rank = int(turnover_info.get("rank") or 0) or None
+            turnover_metric = _safe_float(turnover_info.get("metric_value"))
+            if turnover_rank is None:
+                turnover_bonus = 0
+            elif turnover_rank <= 10:
+                turnover_bonus = 3
+            elif turnover_rank <= 25:
+                turnover_bonus = 2
+            elif turnover_rank <= 50:
+                turnover_bonus = 1
+            else:
+                turnover_bonus = 0
+
+            opportunity_score = max(
+                0.0,
+                min(
+                    100.0,
+                    _safe_float(scores.get("universal_score")) + rs_bonus + sector_bonus + turnover_bonus,
+                ),
+            )
+
+            broker_state = str(broker_intel.get("broker_state") or "FLAT").upper()
+            broker_trust_label = str(broker_intel.get("broker_trust_label") or "UNRATED").upper()
+            broker_data_maturity = str(broker_intel.get("broker_data_maturity") or "LOW").upper()
+            broker_signal_bias = str(broker_intel.get("broker_signal_bias") or "WATCH").upper()
+            broker_signal_strength = str(broker_intel.get("broker_signal_strength") or "WEAK").upper()
+            broker_trust_score = broker_intel.get("broker_trust_score")
+            broker_power_score = _safe_float(broker_intel.get("broker_power_score"), 0.0)
+            signal_power_score = _safe_float(broker_intel.get("signal_power_score"), broker_power_score)
+            high_trust_accum_brokers = _safe_int(broker_intel.get("high_trust_accum_brokers"))
+            medium_plus_accum_brokers = _safe_int(broker_intel.get("medium_plus_accum_brokers"))
+            broker_convergence_flag = str(broker_intel.get("broker_convergence_flag") or "NONE")
+
+            trend_component = _safe_float(scores.get("trend_score"), 50.0)
+            momentum_component = _safe_float(scores.get("momentum_score"), 50.0)
+            volume_component = _safe_float(scores.get("volume_score"), 50.0)
+            setup_component = _safe_float(scores.get("setup_score"), 25.0)
+
+            stop_loss = round(price - (ATR_SL_MULT * atr), 2) if atr else round(price * 0.92, 2)
+            target_1 = round(price + (ATR_T1_MULT * atr), 2) if atr else round(price * 1.08, 2)
+            target_2 = round(price + (ATR_T2_MULT * atr), 2) if atr else round(price * 1.15, 2)
+            stop_loss = max(0.01, stop_loss)
+            risk_per_share = abs(price - stop_loss)
+            rr_ratio = round((target_1 - price) / risk_per_share, 2) if risk_per_share > 0 else 0.0
+            if trading_mode and risk_per_share > 0:
+                raw_size = max(1, int((float(equity) * RISK_PCT) / risk_per_share))
+                max_by_capital = max(1, int(float(equity) / price)) if price > 0 else raw_size
+                max_by_liquidity = max(1, int(avg_volume * MAX_POSITION_SHARE_OF_AVG_VOL)) if avg_volume > 0 else raw_size
+                max_by_allocation = max(1, int((float(equity) * MAX_CAPITAL_ALLOCATION_PCT) / price)) if price > 0 else raw_size
+                position_size = max(1, min(raw_size, max_by_capital, max_by_liquidity, max_by_allocation))
+            elif trading_mode:
+                position_size = 0
+            else:
+                position_size = None
+
+            setup_type = best_setup["setup_type"] if best_setup else None
+            entry_zone = _calc_entry_zone(price, atr, setup_type or "TREND_CONTINUATION")
+            hold_period = _est_hold_period(setup_type or "TREND_CONTINUATION")
+
+            eps = _safe_float(fund.get("eps"))
+            pe = _safe_float(fund.get("pe_ratio"))
+            book_value = _safe_float(fund.get("book_value"))
+            pb_ratio = round(price / book_value, 2) if book_value > 0 else None
+
+            divs = all_divs.get(sym, [])
+            has_dividend_history = any(
+                (_safe_float(d.get("bonus_share_percent")) > 0 or _safe_float(d.get("cash_dividend_percent")) > 0)
+                for d in divs
+            )
+            latest_cash = 0.0
+            if divs:
+                latest_div = max(divs, key=lambda d: _coerce_to_date(d.get("book_close_date")) or date.min)
+                latest_cash = _safe_float(latest_div.get("cash_dividend_percent"))
+            div_yield = round(latest_cash, 2) if latest_cash > 0 else 0.0
+            roe = round((eps / book_value) * 100.0, 2) if book_value > 0 and eps > 0 else 0.0
+            fund_for_score = {
+                "eps": eps,
+                "pe_ratio": pe,
+                "book_value": book_value,
+                "div_yield": div_yield,
+                "roe": roe,
+            }
+            fundamental_score = float(calc_fundamental_score(fund_for_score))
+
+            single_conviction_component = max(
+                0.0,
+                min(100.0, (fundamental_score * 0.55) + (trend_component * 0.25) + (momentum_component * 0.20)),
+            )
+            relative_strength_component = max(
+                0.0,
+                min(100.0, (rs_score * 0.75) + (50.0 + (sector_bonus * 8.0)) * 0.25),
+            )
+            volume_turnover_component = max(
+                0.0,
+                min(100.0, (volume_component * 0.70) + (50.0 + turnover_bonus * 12.0) * 0.30),
+            )
+            market_regime_component = max(
+                0.0,
+                min(100.0, (50.0 + (rs_bonus * 6.0) + (sector_bonus * 6.0)) * normalized_market_regime_factor),
+            )
+
+            trust_base = 30.0 if broker_trust_score is None else _safe_float(broker_trust_score, 30.0)
+            state_bonus = {
+                "ACCUMULATING": 12.0,
+                "HOLDING": 6.0,
+                "ENTERING": 4.0,
+                "DISTRIBUTING": -12.0,
+                "EXITING": -18.0,
+                "FLAT": 0.0,
+            }.get(broker_state, 0.0)
+            signal_bonus = {
+                "BUY": 8.0,
+                "WATCH": 2.0,
+                "EXIT": -15.0,
+            }.get(broker_signal_bias, 0.0)
+            strength_bonus = {
+                "STRONG": 5.0,
+                "MODERATE": 2.0,
+                "WEAK": 0.0,
+            }.get(broker_signal_strength, 0.0)
+            convergence_bonus = 0.0
+            if high_trust_accum_brokers >= 2:
+                convergence_bonus = 8.0
+            elif medium_plus_accum_brokers >= 2:
+                convergence_bonus = 4.0
+            power_bonus = 0.0
+            if signal_power_score > 0:
+                power_bonus = max(-4.0, min(10.0, (signal_power_score - 55.0) / 4.0))
+            broker_behavior_component = max(
+                0.0,
+                min(100.0, trust_base + state_bonus + signal_bonus + strength_bonus + convergence_bonus + power_bonus),
+            )
+
+            model_opportunity_score = max(
+                0.0,
+                min(
+                    100.0,
+                    ((setup_component + trend_component) / 2.0) * 0.30
+                    + single_conviction_component * 0.20
+                    + relative_strength_component * 0.15
+                    + broker_behavior_component * 0.15
+                    + volume_turnover_component * 0.10
+                    + market_regime_component * 0.10,
+                ),
+            )
+            opportunity_score = round((opportunity_score * 0.35) + (model_opportunity_score * 0.65), 2)
+
+            bullish_candidate = bool(best_setup) or opportunity_score >= 65
+            if bullish_candidate and (broker_state in {"ACCUMULATING", "HOLDING", "ENTERING"}) and broker_signal_bias != "EXIT":
+                broker_alignment_flag = "ALIGNED"
+            elif bullish_candidate and (broker_state in {"DISTRIBUTING", "EXITING"} or broker_signal_bias == "EXIT"):
+                broker_alignment_flag = "CONFLICT"
+            elif (not bullish_candidate) and broker_signal_bias == "BUY":
+                broker_alignment_flag = "EARLY_ACCUMULATION"
+            else:
+                broker_alignment_flag = "NEUTRAL"
+
+            data_quality_grade = _grade_data_quality(
+                data_confidence=data_confidence,
+                freshness_days=freshness_days,
+                max_fill_streak=max_fill_streak,
+                has_synthetic_open=has_synthetic_open,
+            )
+
+            safety_multiplier = {
+                "A": 1.00,
+                "B": 0.94,
+                "C": 0.86,
+                "D": 0.72,
+            }.get(data_quality_grade, 0.80)
+            safety_multiplier *= {
+                "HIGH": 1.00,
+                "MEDIUM": 0.97,
+                "LOW": 0.92,
+            }.get(broker_data_maturity, 0.92)
+
+            if broker_alignment_flag == "ALIGNED":
+                safety_multiplier *= 1.05
+            elif broker_alignment_flag == "CONFLICT":
+                safety_multiplier *= 0.78
+
+            veto_reasons: list[str] = []
+            if freshness_days > MAX_ALLOWED_FRESHNESS_DAYS:
+                veto_reasons.append(f"stale_data_{freshness_days}d")
+            if excessive_forward_fill:
+                veto_reasons.append(f"forward_fill_streak_{max_fill_streak}")
+            if has_synthetic_open and freshness_days > 1:
+                veto_reasons.append("synthetic_open_with_stale_context")
+            if rr_ratio < 2.0:
+                veto_reasons.append("rr_below_minimum")
+            if data_confidence < 60:
+                veto_reasons.append("data_confidence_below_floor")
+            if bullish_candidate and broker_signal_bias == "EXIT" and broker_trust_label in {"MEDIUM", "HIGH"}:
+                veto_reasons.append("trusted_broker_exit_bias")
+            if bullish_candidate and broker_state == "EXITING" and broker_trust_label == "HIGH":
+                veto_reasons.append("high_trust_broker_exiting")
+
+            explicit_penalties = float(len(veto_reasons) * 7)
+            if broker_alignment_flag == "CONFLICT":
+                explicit_penalties += 6.0
+
+            fused_score = max(0.0, min(100.0, (opportunity_score * safety_multiplier) - explicit_penalties))
+            hard_veto = len(veto_reasons) > 0
+            final_score = min(fused_score, 59.0) if hard_veto else fused_score
+            priority_tier = _priority_tier_from_score(final_score, veto_reasons)
+            execution_confidence = _execution_confidence_from_grade(data_quality_grade, broker_alignment_flag)
+            broker_size_multiplier = _broker_size_multiplier(
+                broker_trust_label,
+                broker_data_maturity,
+                broker_alignment_flag,
+                power_score=signal_power_score,
+            )
+
+            if trading_mode and position_size is not None and position_size > 0:
+                position_size = max(1, int(position_size * broker_size_multiplier))
+
+            tier_name, tier_icon, tier_color = classify_tier(final_score)
+            fused_score_breakdown = {
+                "opportunity_score": round(opportunity_score, 2),
+                "components": {
+                    "swing_setup_trend": round((setup_component + trend_component) / 2.0, 2),
+                    "single_conviction": round(single_conviction_component, 2),
+                    "relative_strength_sector": round(relative_strength_component, 2),
+                    "broker_behavior_quality": round(broker_behavior_component, 2),
+                    "volume_turnover": round(volume_turnover_component, 2),
+                    "market_alignment": round(market_regime_component, 2),
+                },
+                "safety_multiplier": round(safety_multiplier, 3),
+                "explicit_penalties": round(explicit_penalties, 2),
+                "market_regime_factor": round(normalized_market_regime_factor, 3),
+                "fused_score": round(fused_score, 2),
+                "final_score": round(final_score, 2),
+            }
+
+            mfi = calc_mfi(candles)
+            vol_20d = _volatility_20d(closes)
+            max_dd = _max_drawdown(closes)
+
+            consistency_sessions = int(broker_consistency.get(sym, 0))
+            boom_flag = bool(
+                has_consistency_window
+                and broker_asym > 65
+                and consistency_sessions >= min_sessions
+                and vol_ratio >= 1.3
+                and rsi is not None
+                and 40 <= float(rsi) <= 80
+                and sma20 is not None
+                and price >= float(sma20)
+            )
+
+            fib_618_broken = False
+            if hi52 > lo52 > 0:
+                try:
+                    fib_levels = calc_fibonacci_retracement(lo52, hi52)
+                    fib_618_broken = price < _safe_float((fib_levels or {}).get("fib_618"))
+                except Exception:
+                    fib_618_broken = False
+
+            book_warning = book_closure_map.get(sym)
+            if book_warning and int(book_warning.get("days_to_close", 999)) > 30:
+                book_warning = None
+
+            sell_dist_pct = high_prox
+
+            a_for_story = {
+                "price": price,
+                "sma20": sma20,
+                "sma50": sma50,
+                "sma200": sma200,
+                "cross": cross,
+                "rsi": rsi,
+                "macd_hist": macd_hist,
+                "macd_just_bullish": macd_just_bullish,
+                "macd_just_bearish": macd_just_bearish,
+                "vol_ratio": vol_ratio,
+                "obv_trend": obv_trend,
+                "asym_score": broker_asym,
+                "high_prox": high_prox,
+                "bb_squeeze": bb_squeeze,
+                "bb_breakout": bool(bb_upper is not None and price > bb_upper and vol_ratio >= 1.5),
+                "patterns": patterns,
+                "rr_ratio": rr_ratio,
+                "fib_618_broken": fib_618_broken,
+                "circuit_flag": circuit_volatile,
+                "liquidity_flag": bool(is_low_liquidity(candles, LOW_LIQ_THRESH)),
+                "data_bars": len(candles),
+                "vol_20d": vol_20d,
+                "max_drawdown": max_dd,
+                "sell_dist_pct": sell_dist_pct,
+                "vpt_bearish_div": vpt_bearish_div,
+            }
+
+            strengths = []
+            weaknesses = []
+            if not quick:
+                strengths = build_strengths(a_for_story, fund_for_score)
+                weaknesses = build_weaknesses(a_for_story, fund_for_score)
+
+            stock = {
+                "symbol": sym,
+                "company_name": det.get("security_name") or sym,
+                "sector": sector,
+                "price": round(price, 2),
+                "score": round(final_score, 2),
+                "universal_score": round(final_score, 2),
+                "fused_score": round(fused_score, 2),
+                "opportunity_score": round(opportunity_score, 2),
+                "fused_score_breakdown": fused_score_breakdown,
+                "veto_reasons": veto_reasons,
+                "hard_veto": hard_veto,
+                "broker_alignment_flag": broker_alignment_flag,
+                "data_quality_grade": data_quality_grade,
+                "priority_tier": priority_tier,
+                "execution_confidence": execution_confidence,
+                "base_universal_score": _safe_float(scores.get("universal_score")),
+                "tier_name": tier_name,
+                "tier_icon": tier_icon,
+                "tier_color": tier_color,
+                "setup_type": setup_type,
+                "setup_reasoning": best_setup.get("reasoning", []) if best_setup else [],
+                "all_setups": setups,
+                "confidence": best_setup.get("confidence", 0) if best_setup else 0,
+                "entry_zone": entry_zone,
+                "hold_period": hold_period,
+                "stop_loss": stop_loss,
+                "target_1": target_1,
+                "target_2": target_2,
+                "rr_ratio": rr_ratio,
+                "position_size": position_size,
+                "sma20": sma20,
+                "sma50": sma50,
+                "sma200": sma200,
+                "rsi": rsi,
+                "macd_val": macd_val,
+                "macd_hist": macd_hist,
+                "macd_just_bullish": macd_just_bullish,
+                "atr": atr,
+                "stoch_k": stoch_k,
+                "stoch_d": stoch_d,
+                "obv_trend": obv_trend,
+                "vol_ratio": vol_ratio,
+                "avg_volume": round(avg_volume),
+                "data_bars": len(candles),
+                "data_confidence": data_confidence,
+                "freshness_days": freshness_days,
+                "max_forward_fill_streak": max_fill_streak,
+                "excessive_forward_fill": excessive_forward_fill,
+                "is_synthetic_open": has_synthetic_open,
+                "fundamental_stale": fundamental_stale,
+                "mfi": mfi,
+                "vwap": vwap_map.get(sym),
+                "hi52": hi52,
+                "lo52": lo52,
+                "high_prox": high_prox,
+                "weekly_uptrend": weekly_uptrend,
+                "broker_asym": broker_asym,
+                "boom_flag": boom_flag,
+                "top_mover_streak": int(top_mover_streaks.get(sym, 0)),
+                "scrip_rank_turnover": turnover_rank,
+                "scrip_turnover_value": turnover_metric,
+                "turnover_bonus": turnover_bonus,
+                "fundamental_score": fundamental_score,
+                "eps": eps,
+                "pe": pe,
+                "book_value": book_value,
+                "pb_ratio": pb_ratio,
+                "div_yield": div_yield,
+                "has_dividend_history": has_dividend_history,
+                "vol_20d": vol_20d,
+                "max_drawdown": max_dd,
+                "strengths": strengths,
+                "weaknesses": weaknesses,
+                "sector_avg_pe": sector_pe_avg.get(sector),
+                "sector_leadership": sector_state,
+                "sector_bonus": sector_bonus,
+                "sector_rsi_pct": None,
+                "sector_rsi_bonus": 0,
+                "sector_rsi_state": "neutral",
+                "rs_delta": rs_delta,
+                "rs_bonus": rs_bonus,
+                "rs_score": rs_score,
+                "book_closure_warning": book_warning,
+                "wabr_support": wabr_map.get(sym),
+                "broker_buy_amt": _safe_float(flow.get("buy_amt")),
+                "broker_sell_amt": _safe_float(flow.get("sell_amt")),
+                "broker_buy_qty": _safe_float(flow.get("buy_qty")),
+                "broker_sell_qty": _safe_float(flow.get("sell_qty")),
+                "broker_buy_sell_ratio": flow.get("buy_sell_ratio"),
+                "broker_flow_intensity": _safe_float(flow.get("flow_intensity")),
+                "broker_flow_dominance": _safe_float(flow.get("flow_dominance")),
+                "broker_flow_signal": flow.get("flow_signal", "NO_FLOW"),
+                "broker_state": broker_state,
+                "broker_trust_score": broker_trust_score,
+                "broker_trust_label": broker_trust_label,
+                "broker_power_score": broker_power_score,
+                "signal_power_score": signal_power_score,
+                "broker_tier": broker_intel.get("broker_tier"),
+                "broker_data_maturity": broker_data_maturity,
+                "broker_signal_bias": broker_signal_bias,
+                "broker_signal_strength": broker_signal_strength,
+                "signal_bcr": broker_intel.get("signal_bcr"),
+                "signal_volume_ratio": broker_intel.get("signal_volume_ratio"),
+                "signal_circuit_active": bool(broker_intel.get("signal_circuit_active")),
+                "signal_exit_category": broker_intel.get("signal_exit_category"),
+                "signal_protective_exit": bool(broker_intel.get("signal_protective_exit")),
+                "signal_structural_stop_triggered": bool(broker_intel.get("signal_structural_stop_triggered")),
+                "signal_time_stop_triggered": bool(broker_intel.get("signal_time_stop_triggered")),
+                "signal_position_size_qty": _safe_int(broker_intel.get("signal_position_size_qty")),
+                "high_trust_accum_brokers": high_trust_accum_brokers,
+                "medium_plus_accum_brokers": medium_plus_accum_brokers,
+                "broker_convergence_flag": broker_convergence_flag,
+                "broker_size_multiplier": broker_size_multiplier,
+                "top_buy_brokers": flow.get("top_buy_brokers", []),
+                "top_sell_brokers": flow.get("top_sell_brokers", []),
+                "circuit_volatile": circuit_volatile,
+                "vpt_bearish_div": vpt_bearish_div,
+                "close_series": closes,
+                "volume_series": volumes,
+            }
+            ranked.append(stock)
+            diagnostics["processed"] += 1
+
+        except Exception as e:
+            diagnostics["skipped_errors"] += 1
+            print(f"  [warn] skipped {sym} during universe build: {e}")
+            continue
+
+    _apply_sector_rsi_context(ranked)
+
+    ranked.sort(key=lambda s: s.get("score", 0), reverse=True)
+    diagnostics["ranked"] = len(ranked)
+    by_symbol = {s["symbol"]: s for s in ranked}
+
+    # Keep sector rank metadata available in both quick and deep modes.
+    by_sector: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for s in ranked:
+        by_sector[s.get("sector") or "Other"].append(s)
+    for sec, items in by_sector.items():
+        ordered = sorted(items, key=lambda x: x.get("score", 0), reverse=True)
+        size = len(ordered)
+        for i, row in enumerate(ordered, start=1):
+            row["sector_rank"] = i
+            row["sector_size"] = size
+            if not quick:
+                row["sector_peers"] = [
+                    p["symbol"]
+                    for p in ordered[:6]
+                    if p["symbol"] != row["symbol"]
+                ][:4]
+            else:
+                row["sector_peers"] = []
+
+    return ranked, by_symbol, diagnostics
+
+

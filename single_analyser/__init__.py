@@ -11,6 +11,16 @@ Usage:
 import os
 import sys
 import time
+import concurrent.futures
+import multiprocessing
+
+def _process_single(symbol):
+    from single_analyser.logic import analyze_single_stock
+    try:
+        data = analyze_single_stock(symbol, quiet=True)
+        return symbol, data, None
+    except Exception as e:
+        return symbol, None, str(e)
 
 
 def _parse_args():
