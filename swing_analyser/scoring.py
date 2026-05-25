@@ -22,7 +22,7 @@ from swing_analyser.logic import (
     fetch_all_ohlcv, fetch_all_corp_actions, fetch_all_dividends,
     fetch_all_company_details, fetch_all_securities, fetch_52w_from_snapshots,
     fetch_all_live_ltp, fetch_all_fundamentals, fetch_broker_scores,
-    fetch_market_regime,
+    get_market_regime, set_dynamic_rsi,
     # Data pipeline
     bridge_live_candle, get_adjusted_series, forward_fill_zero_volume_days,
     resample_to_weekly,
@@ -38,7 +38,7 @@ from swing_analyser.logic import (
     _calc_entry_zone, _est_hold_period,
     # Constants
     ACCOUNT_EQUITY, RISK_PCT, ATR_SL_MULT, ATR_T1_MULT, ATR_T2_MULT,
-    RSI_OVERBOUGHT, RSI_OVERSOLD, MIN_RR_RATIO,
+    get_rsi_ob, get_rsi_os, MIN_RR_RATIO,
     MIN_BROKER_LIQ_VOLUME, MAX_POSITION_SHARE_OF_AVG_VOL,
     MAX_CAPITAL_ALLOCATION_PCT, _is_fundamental_stale,
     _compute_data_confidence,
@@ -171,9 +171,9 @@ def calc_universal_score(*, price, sma20, sma50, sma200,
     if rsi is not None:
         if 40 <= rsi <= 60:
             mom += 10
-        elif rsi < RSI_OVERSOLD:
+        elif rsi < get_rsi_os():
             mom += 15       # Potential reversal
-        elif rsi > RSI_OVERBOUGHT:
+        elif rsi > get_rsi_ob():
             mom -= 15
     if macd_hist is not None:
         mom += 15 if macd_hist > 0 else -10
@@ -432,7 +432,8 @@ def run_ranking_analysis(account_equity=None):
         all_live = fetch_all_live_ltp(conn)
         all_fund = fetch_all_fundamentals(conn)
         broker_scores = fetch_broker_scores(conn)
-        regime = fetch_market_regime(conn)
+        regime = get_market_regime(conn)
+        set_dynamic_rsi(regime)
 
         # ──────────────────────────────────────────────────────────────────
         #  TIER 1: Broker signal computation (optional)

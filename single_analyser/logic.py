@@ -21,6 +21,26 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 import pymysql
+
+_DYNAMIC_RSI = {"ob": 80, "os": 20}
+
+def set_dynamic_rsi(regime_dict):
+    global _DYNAMIC_RSI
+    reg = regime_dict.get("regime", "NEUTRAL")
+    if reg == "STRONG_BULL":
+        _DYNAMIC_RSI["ob"] = 85
+        _DYNAMIC_RSI["os"] = 30
+    elif reg == "STRONG_BEAR":
+        _DYNAMIC_RSI["ob"] = 70
+        _DYNAMIC_RSI["os"] = 15
+    else:
+        _DYNAMIC_RSI["ob"] = 80
+        _DYNAMIC_RSI["os"] = 20
+
+def get_rsi_ob(): return _DYNAMIC_RSI["ob"]
+def get_rsi_os(): return _DYNAMIC_RSI["os"]
+
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -34,8 +54,8 @@ RISK_PCT       = 0.015
 ATR_SL_MULT    = 1.5
 ATR_T1_MULT    = 2.0
 ATR_T2_MULT    = 3.5
-RSI_OVERBOUGHT = 80
-RSI_OVERSOLD   = 20
+RSI_OVERBOUGHT = 80  # Deprecated in favor of get_rsi_ob()
+RSI_OVERSOLD = 20    # Deprecated in favor of get_rsi_os()
 MIN_BARS_RSI   = 100
 MIN_BARS_MACD  = 35
 MIN_BARS_BB    = 20
@@ -946,35 +966,170 @@ def _compute_data_confidence(*, bars, avg_volume, circuit_volatile, liquidity_fl
 # ═══════════════════════════════════════════════════════════════════════
 
 def classify_signal(*, rsi, macd_hist, cross, bb_pct, price,
-                    sma20, sma50, sma200, vol_ratio, obv_trend,
-                    stoch_k, stoch_d, breakout_candidate):
-    score = 0
-    if rsi is not None:
-        if rsi < RSI_OVERSOLD: score += 2
-        elif rsi < 40: score += 1
-        elif rsi > RSI_OVERBOUGHT: score -= 2
-        elif rsi > 65: score -= 1
+                     sma20, sma50, sma200, vol_ratio, obv_trend,
+                     stoch_k, stoch_d, breakout_candidate):
+    """Dual-axis signal: Trend (where is it going?) × Timing (is NOW good?).
+
+    Trend Indicators: MA alignment, MACD histogram, OBV direction
+      → Determines if the stock is in an uptrend, downtrend, or neutral
+
+    Timing Indicators: RSI, Stochastic, Bollinger %B, volume spikes
+      → Determines if it's a good entry/exit point RIGHT NOW
+
+    The signal comes from the INTERSECTION, not the sum:
+      Uptrend + Good timing   → STRONG BUY
+      Uptrend + Neutral timing → HOLD (trend already priced in)
+      Uptrend + Bad timing     → SELL (take profit)
+      Downtrend + Good timing  → BUY (contrarian entry)
+      Downtrend + Bad timing   → STRONG SELL
+    """
+
+    # ── TREND SCORE (is the stock trending up or down?) ──
+    trend = 0
+
+    # MA Crossovers — strongest trend signal
+    if cross == "GOLDEN":
+        trend += 3
+    elif cross == "BULLISH":
+        trend += 1
+    elif cross == "DEATH":
+        trend -= 3
+    elif cross == "BEARISH":
+        trend -= 1
+
+    # MACD histogram — trend momentum
     if macd_hist is not None:
-        if macd_hist > 0: score += 1
-        else: score -= 1
-    if cross == "GOLDEN": score += 2
-    elif cross == "BULLISH": score += 1
-    elif cross == "DEATH": score -= 2
-    elif cross == "BEARISH": score -= 1
-    if bb_pct is not None:
-        if bb_pct < 20: score += 1
-        elif bb_pct > 80: score -= 1
-    if sma20 and sma50 and price > sma20 > sma50: score += 1
-    elif sma50 and price < sma50: score -= 1
-    if sma200 and price < sma200: score -= 2
-    if vol_ratio >= 1.5 and macd_hist is not None and macd_hist > 0: score += 1
-    if vol_ratio >= 1.5 and macd_hist is not None and macd_hist < 0: score -= 1
-    if obv_trend == "RISING": score += 1
-    elif obv_trend == "FALLING": score -= 1
+        if macd_hist > 0:
+            trend += 1
+        else:
+            trend -= 1
+
+    # OBV — accumulation/distribution trend
+    if obv_trend == "RISING":
+        trend += 1
+    elif obv_trend == "FALLING":
+        trend -= 1
+
+    # Long-term trend context
+    if sma200 and price > sma200:
+        trend += 1
+    elif sma200 and price < sma200:
+        trend -= 1
+
+    # ── TIMING SCORE (is NOW a good entry/exit point?) ──
+    timing = 0
+
+    # RSI — contrarian: oversold = good buy timing, overbought = good sell timing
+    if rsi is not None:
+        if rsi < get_rsi_os():
+            timing += 3      # Deeply oversold — strong buy timing
+        elif rsi < get_rsi_os() + 10:
+            timing += 2      # Approaching oversold (e.g. RSI 20-30) — good timing
+        elif rsi < 40:
+            timing += 1      # Getting cheap
+        elif rsi > get_rsi_ob():
+            timing -= 3      # Deeply overbought — strong sell timing
+        elif rsi > get_rsi_ob() - 10:
+            timing -= 2      # Approaching overbought (e.g. RSI 70-80) — bad timing
+        # NOTE: RSI 40 to (overbought-10) is NEUTRAL timing — no longer penalizes uptrends
+
+    # Stochastic — short-term overbought/oversold
     if stoch_k is not None and stoch_d is not None:
-        if stoch_k < 20 and stoch_k > stoch_d: score += 1
-        elif stoch_k > 80 and stoch_k < stoch_d: score -= 1
-    if breakout_candidate: score += 2
+        if stoch_k < 20 and stoch_k > stoch_d:
+            timing += 1      # Oversold bullish cross
+        elif stoch_k > 80 and stoch_k < stoch_d:
+            timing -= 1      # Overbought bearish cross
+
+    # Bollinger %B — contrarian: near lower band = buy, near upper = sell
+    if bb_pct is not None:
+        if bb_pct < 15:
+            timing += 1      # Near lower band — potential bounce
+        elif bb_pct > 90:
+            timing -= 1      # Extended above upper band
+
+    # Volume spike — confirms timing only when directional
+    if vol_ratio >= 1.5:
+        if rsi is not None and rsi < 40:
+            timing += 1      # Volume on a dip = capitulation (bullish timing)
+        elif rsi is not None and rsi > get_rsi_ob():
+            timing -= 1      # Volume at top = blow-off (bearish timing)
+
+    # Breakout — special case: overrides normal timing
+    if breakout_candidate:
+        trend += 2
+        timing += 1
+
+    # ── SIGNAL MATRIX ──
+    # Classify trend direction
+    if trend >= 3:
+        trend_dir = "STRONG_UP"
+    elif trend >= 1:
+        trend_dir = "UP"
+    elif trend <= -3:
+        trend_dir = "STRONG_DOWN"
+    elif trend <= -1:
+        trend_dir = "DOWN"
+    else:
+        trend_dir = "FLAT"
+
+    # Classify timing
+    if timing >= 2:
+        timing_dir = "GOOD"      # Oversold / good entry
+    elif timing <= -2:
+        timing_dir = "BAD"       # Overbought / take profit
+    else:
+        timing_dir = "NEUTRAL"
+
+    # ── DECISION MATRIX ──
+    # Strong uptrend
+    if trend_dir == "STRONG_UP":
+        if timing_dir == "GOOD":
+            return "STRONG BUY"
+        elif timing_dir == "BAD":
+            return "HOLD"        # Don't sell into a strong trend, just hold
+        else:
+            return "BUY"         # Strong trend + neutral timing = still a buy
+
+    # Mild uptrend
+    if trend_dir == "UP":
+        if timing_dir == "GOOD":
+            return "BUY"
+        elif timing_dir == "BAD":
+            return "SELL"        # Uptrend losing momentum + bad timing = take profit
+        else:
+            return "HOLD"
+
+    # Flat / no trend
+    if trend_dir == "FLAT":
+        if timing_dir == "GOOD":
+            return "BUY"         # No trend but oversold = speculative buy
+        elif timing_dir == "BAD":
+            return "SELL"        # No trend but overbought = sell
+        else:
+            return "HOLD"
+
+    # Mild downtrend
+    if trend_dir == "DOWN":
+        if timing_dir == "GOOD":
+            return "HOLD"        # Downtrend but oversold = wait for confirmation
+        elif timing_dir == "BAD":
+            return "STRONG SELL"
+        else:
+            return "SELL"
+
+    # Strong downtrend
+    if trend_dir == "STRONG_DOWN":
+        if timing_dir == "GOOD":
+            return "HOLD"        # Even oversold in a crash = don't catch falling knife
+        elif timing_dir == "BAD":
+            return "STRONG SELL"
+        else:
+            return "SELL"
+
+    return "HOLD"
+
+
+
 
     if score >= 5: return "STRONG BUY"
     elif score >= 2: return "BUY"
@@ -984,17 +1139,168 @@ def classify_signal(*, rsi, macd_hist, cross, bb_pct, price,
 
 
 def calc_confidence(signal, rsi, macd_hist, vol_ratio, obv_trend,
-                    cross, bb_pct, asym_score):
+                     cross, bb_pct, asym_score):
+    """Calculate confidence with PENALTIES for contradicting indicators.
+    A BUY signal with falling OBV should NOT show 80% confidence."""
     conf = 50
-    if signal in ("STRONG BUY", "STRONG SELL"): conf = 80
-    elif signal in ("BUY", "SELL"): conf = 65
-    if rsi is not None and (rsi < 25 or rsi > 75): conf += 5
-    if macd_hist is not None and abs(macd_hist) > 2: conf += 5
-    if vol_ratio >= 2.0: conf += 5
-    if obv_trend in ("RISING", "FALLING"): conf += 3
-    if cross in ("GOLDEN", "DEATH"): conf += 10
-    if asym_score > 70 or asym_score < 30: conf += 5
-    return min(100, max(0, conf))
+    if signal in ("STRONG BUY", "STRONG SELL"):
+        conf = 80
+    elif signal in ("BUY", "SELL"):
+        conf = 65
+
+    is_bullish = signal in ("BUY", "STRONG BUY")
+    is_bearish = signal in ("SELL", "STRONG SELL")
+
+    # ── CONFIRMATIONS (boost confidence) ──
+    if rsi is not None:
+        if (is_bullish and rsi < 35) or (is_bearish and rsi > 70):
+            conf += 5  # RSI confirms direction
+
+    if macd_hist is not None and abs(macd_hist) > 2:
+        if (is_bullish and macd_hist > 0) or (is_bearish and macd_hist < 0):
+            conf += 5  # MACD confirms direction
+
+    if vol_ratio >= 2.0:
+        conf += 3  # High volume adds conviction either way
+
+    if cross in ("GOLDEN",) and is_bullish:
+        conf += 10
+    elif cross in ("DEATH",) and is_bearish:
+        conf += 10
+
+    if asym_score > 70 and is_bullish:
+        conf += 5  # Smart money confirms buy
+    elif asym_score < 30 and is_bearish:
+        conf += 5  # Smart money confirms sell
+
+    # ── CONTRADICTIONS (penalize confidence) ──
+    if is_bullish:
+        if obv_trend == "FALLING":
+            conf -= 10  # Buying but distribution happening
+        if cross in ("DEATH", "BEARISH"):
+            conf -= 15  # Buying into a downtrend
+        if rsi is not None and rsi > get_rsi_ob():
+            conf -= 10  # Buying at overbought levels
+        if macd_hist is not None and macd_hist < -2:
+            conf -= 8   # MACD strongly bearish
+        if asym_score < 35:
+            conf -= 5   # Smart money not buying
+
+    if is_bearish:
+        if obv_trend == "RISING":
+            conf -= 10  # Selling but accumulation happening
+        if cross in ("GOLDEN", "BULLISH"):
+            conf -= 15  # Selling into an uptrend
+        if rsi is not None and rsi < get_rsi_os():
+            conf -= 10  # Selling at oversold levels
+        if macd_hist is not None and macd_hist > 2:
+            conf -= 8   # MACD strongly bullish
+        if asym_score > 65:
+            conf -= 5   # Smart money accumulating
+
+    return min(100, max(10, conf))  # Floor at 10%, not 0%
+
+# ═══════════════════════════════════════════════════════════════════════
+#  FUNDAMENTAL ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════
+
+def fundamental_analysis(conn):
+    print("  [3] Fundamental Analysis...")
+    raw_rows = q(conn, """
+        SELECT cf.symbol, cf.eps, cf.pe_ratio, cf.book_value, cf.net_profit,
+               cf.fiscal_year, cf.quarter,
+               cd.sector_name, cd.fifty_two_week_high, cd.fifty_two_week_low,
+               cd.market_capitalization, cd.stock_listed_shares
+        FROM company_fundamentals cf
+        JOIN company_details cd ON cf.symbol = cd.symbol
+        ORDER BY cf.symbol, cf.published_date DESC
+    """)
+    seen, rows = set(), []
+    for r in raw_rows:
+        if r["symbol"] not in seen:
+            seen.add(r["symbol"])
+            rows.append(r)
+
+    div_rows = q(conn, """
+        SELECT d.symbol, d.cash_dividend_percent
+        FROM dividends d
+        WHERE d.book_close_date = (
+            SELECT MAX(d2.book_close_date) FROM dividends d2
+            WHERE d2.symbol = d.symbol AND d2.cash_dividend_percent > 0
+        )
+    """)
+    div_map = {r["symbol"]: float(r["cash_dividend_percent"] or 0) for r in div_rows}
+
+    results = {}
+    for r in rows:
+        eps   = float(r["eps"]          or 0)
+        pe    = float(r["pe_ratio"]     or 0)
+        bv    = float(r["book_value"]   or 0)
+        mcap  = float(r["market_capitalization"] or 0)
+        hi52  = float(r["fifty_two_week_high"]   or 0)
+        lo52  = float(r["fifty_two_week_low"]    or 0)
+
+        price_approx = eps * pe if eps and pe else 0
+        pbv   = round(price_approx / bv, 2) if bv > 0 else None
+        roe   = round(eps / bv * 100, 1)     if bv > 0 and eps > 0 else 0
+
+        dps   = div_map.get(r["symbol"], 0)
+        div_yield = round(dps / price_approx * 100, 2) if price_approx > 0 and dps > 0 else 0
+
+        # Fundamental score
+        score = 0
+        if 0 < pe <= 15:    score += 25
+        elif 15 < pe <= 25: score += 18
+        elif 25 < pe <= 40: score += 10
+
+        if eps > 30:        score += 20
+        elif eps > 15:      score += 16
+        elif eps > 5:       score += 12
+        elif eps > 0:       score += 8
+
+        if pbv and pbv < 1.5: score += 15
+        elif pbv and pbv < 3: score += 8
+
+        if lo52 > 0 and price_approx > 0 and hi52 != lo52:
+            prox = (price_approx - lo52) / (hi52 - lo52) * 100
+            if prox < 30:   score += 20
+            elif prox < 50: score += 12
+
+        if div_yield > 5:   score += 10
+        elif div_yield > 2: score += 5
+        if roe > 20:        score += 10
+        elif roe > 10:      score += 5
+
+        results[r["symbol"]] = {
+            "symbol": r["symbol"], "sector": r["sector_name"],
+            "eps": eps, "pe_ratio": pe, "book_value": bv, "pbv": pbv,
+            "net_profit": float(r["net_profit"] or 0),
+            "fiscal_year": r["fiscal_year"], "quarter": r["quarter"],
+            "hi52": hi52, "lo52": lo52, "mcap": mcap,
+            "roe": roe, "div_yield": div_yield,
+            "fund_score": score,
+        }
+    return results
+
+# ═══════════════════════════════════════════════════════════════════════
+#  SECTOR ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════
+
+def sector_breakdown(conn):
+    print("  [4] Sector Breakdown...")
+    subs = q(conn, "SELECT * FROM nepse_sub_indices ORDER BY percent_change DESC")
+    sector_data = q(conn, """
+        SELECT sector, SUM(turnover) as total_turnover, SUM(volume) as total_volume,
+               SUM(transaction_count) as total_txns, COUNT(*) as stock_count,
+               AVG(percent_change) as avg_change
+        FROM daily_trade_turnover_transaction_subindices
+        WHERE sector IS NOT NULL
+        GROUP BY sector ORDER BY total_turnover DESC
+    """)
+    return {"sub_indices": subs, "sectors": sector_data}
+
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════

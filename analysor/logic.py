@@ -41,6 +41,37 @@ MIN_RR_RATIO   = 2.0              # Minimum reward-to-risk ratio
 MAX_FORWARD_FILL_STREAK = 5
 LIVE_CANDLE_DEVIATION_BUFFER = 0.02
 
+# Dynamic RSI thresholds tied to market regime
+# Module-level cache — set during run_full_analysis() after regime is determined
+_DYNAMIC_RSI = {"overbought": RSI_OVERBOUGHT, "oversold": RSI_OVERSOLD}
+
+def set_dynamic_rsi(regime):
+    """Set RSI thresholds based on market regime.
+    STRONG_BULL: wider band (85/30) — don't sell too early in rallies
+    NEUTRAL:     standard NEPSE (80/20)
+    STRONG_BEAR: tighter band (70/15) — don't buy too early in crashes"""
+    global _DYNAMIC_RSI
+    r = regime.get("regime", "NEUTRAL")
+    if r == "STRONG_BULL":
+        _DYNAMIC_RSI = {"overbought": 85, "oversold": 30}
+    elif r == "BULLISH":
+        _DYNAMIC_RSI = {"overbought": 82, "oversold": 25}
+    elif r == "STRONG_BEAR":
+        _DYNAMIC_RSI = {"overbought": 70, "oversold": 15}
+    elif r == "BEARISH":
+        _DYNAMIC_RSI = {"overbought": 75, "oversold": 18}
+    else:
+        _DYNAMIC_RSI = {"overbought": RSI_OVERBOUGHT, "oversold": RSI_OVERSOLD}
+
+def get_rsi_ob():
+    """Get current dynamic overbought threshold."""
+    return _DYNAMIC_RSI["overbought"]
+
+def get_rsi_os():
+    """Get current dynamic oversold threshold."""
+    return _DYNAMIC_RSI["oversold"]
+
+
 # ═══════════════════════════════════════════════════════════════════════
 #  DATABASE
 # ═══════════════════════════════════════════════════════════════════════
@@ -750,17 +781,38 @@ def is_breakout_candidate(close, sma50, high_52w, vol_ratio, macd_hist):
 # ═══════════════════════════════════════════════════════════════════════
 
 def get_market_regime(conn):
-    idx = qone(conn, """
-        SELECT change_percent FROM market_indices
+    """Multi-day regime detection using 10-day trend of NEPSE index.
+    Prevents a single green/red day from flipping all signals."""
+    rows = q(conn, """
+        SELECT change_percent, current_value
+        FROM market_indices
         WHERE index_name = 'NEPSE'
-        ORDER BY date DESC LIMIT 1
+        ORDER BY date DESC LIMIT 10
     """)
-    chg = float(idx.get("change_percent") or 0)
-    if chg > 1.0:
-        return {"regime": "BULLISH",  "factor": 1.1, "chg": chg}
-    if chg < -1.0:
-        return {"regime": "BEARISH",  "factor": 0.9, "chg": chg}
-    return {"regime": "NEUTRAL", "factor": 1.0, "chg": chg}
+    if not rows:
+        return {"regime": "NEUTRAL", "factor": 1.0, "chg": 0, "trend": 0}
+
+    today_chg = float(rows[0].get("change_percent") or 0)
+    closes = [float(r.get("current_value") or 0) for r in rows
+              if float(r.get("current_value") or 0) > 0]
+
+    if len(closes) >= 5:
+        sma10 = sum(closes) / len(closes)
+        trend = (closes[0] - sma10) / sma10 * 100 if sma10 > 0 else 0
+    else:
+        trend = today_chg
+
+    # Narrowed factor range: ±5% max (was ±10%)
+    # Requires sustained multi-day trend, not just one day
+    if trend > 3.0:
+        return {"regime": "STRONG_BULL", "factor": 1.05, "chg": today_chg, "trend": round(trend, 2)}
+    if trend > 1.0:
+        return {"regime": "BULLISH",     "factor": 1.02, "chg": today_chg, "trend": round(trend, 2)}
+    if trend < -3.0:
+        return {"regime": "STRONG_BEAR", "factor": 0.95, "chg": today_chg, "trend": round(trend, 2)}
+    if trend < -1.0:
+        return {"regime": "BEARISH",     "factor": 0.98, "chg": today_chg, "trend": round(trend, 2)}
+    return {"regime": "NEUTRAL", "factor": 1.0, "chg": today_chg, "trend": round(trend, 2)}
 
 
 def seasonality_bonus():
@@ -1328,7 +1380,7 @@ def _build_reasons(*, price, rsi, macd_val, macd_hist,
     # ── BULLISH REASONS ──
     if macd_just_bullish:
         reasons.append("✅ Bullish MACD Crossover")
-    if rsi is not None and rsi < RSI_OVERSOLD:
+    if rsi is not None and rsi < get_rsi_os():
         reasons.append(f"✅ RSI Oversold Recovery (RSI: {rsi})")
     if sma20 and sma50 and price > sma20 and price > sma50:
         reasons.append("✅ Above SMA20 & SMA50")
@@ -1358,8 +1410,8 @@ def _build_reasons(*, price, rsi, macd_val, macd_hist,
     # ── BEARISH REASONS ──
     if macd_just_bearish or (macd_hist is not None and macd_hist < 0):
         reasons.append(f"❌ Bearish MACD ({macd_hist or 0:.2f})")
-    if rsi is not None and rsi > RSI_OVERBOUGHT:
-        reasons.append(f"❌ RSI Overbought ({rsi:.1f} > {RSI_OVERBOUGHT})")
+    if rsi is not None and rsi > get_rsi_ob():
+        reasons.append(f"❌ RSI Overbought ({rsi:.1f} > {get_rsi_ob()})")
     if sma50 and price < sma50:
         reasons.append("❌ Below SMA50")
     if sma200 and price < sma200:
@@ -1411,112 +1463,228 @@ def _build_reasons(*, price, rsi, macd_val, macd_hist,
 def _classify_signal(*, rsi, macd_hist, cross, bb_pct, price,
                      sma20, sma50, sma200, vol_ratio, obv_trend,
                      stoch_k, stoch_d, breakout_candidate):
-    """Generate BUY / SELL / HOLD / STRONG BUY / STRONG SELL signal."""
-    score = 0
+    """Dual-axis signal: Trend (where is it going?) × Timing (is NOW good?).
 
-    # RSI
-    if rsi is not None:
-        if rsi < RSI_OVERSOLD:
-            score += 2
-        elif rsi < 40:
-            score += 1
-        elif rsi > RSI_OVERBOUGHT:
-            score -= 2
-        elif rsi > 65:
-            score -= 1
+    Trend Indicators: MA alignment, MACD histogram, OBV direction
+      → Determines if the stock is in an uptrend, downtrend, or neutral
 
-    # MACD
+    Timing Indicators: RSI, Stochastic, Bollinger %B, volume spikes
+      → Determines if it's a good entry/exit point RIGHT NOW
+
+    The signal comes from the INTERSECTION, not the sum:
+      Uptrend + Good timing   → STRONG BUY
+      Uptrend + Neutral timing → HOLD (trend already priced in)
+      Uptrend + Bad timing     → SELL (take profit)
+      Downtrend + Good timing  → BUY (contrarian entry)
+      Downtrend + Bad timing   → STRONG SELL
+    """
+
+    # ── TREND SCORE (is the stock trending up or down?) ──
+    trend = 0
+
+    # MA Crossovers — strongest trend signal
+    if cross == "GOLDEN":
+        trend += 3
+    elif cross == "BULLISH":
+        trend += 1
+    elif cross == "DEATH":
+        trend -= 3
+    elif cross == "BEARISH":
+        trend -= 1
+
+    # MACD histogram — trend momentum
     if macd_hist is not None:
         if macd_hist > 0:
-            score += 1
+            trend += 1
         else:
-            score -= 1
+            trend -= 1
 
-    # Cross
-    if cross == "GOLDEN":
-        score += 2
-    elif cross == "BULLISH":
-        score += 1
-    elif cross == "DEATH":
-        score -= 2
-    elif cross == "BEARISH":
-        score -= 1
-
-    # Bollinger
-    if bb_pct is not None:
-        if bb_pct < 20:
-            score += 1
-        elif bb_pct > 80:
-            score -= 1
-
-    # Trend
-    if sma20 and sma50 and price > sma20 > sma50:
-        score += 1
-    elif sma50 and price < sma50:
-        score -= 1
-
-    if sma200 and price < sma200:
-        score -= 2
-
-    # Volume
-    if vol_ratio >= 1.5 and macd_hist is not None and macd_hist > 0:
-        score += 1
-    if vol_ratio >= 1.5 and macd_hist is not None and macd_hist < 0:
-        score -= 1
-
-    # OBV
+    # OBV — accumulation/distribution trend
     if obv_trend == "RISING":
-        score += 1
+        trend += 1
     elif obv_trend == "FALLING":
-        score -= 1
+        trend -= 1
 
-    # Stochastic
+    # Long-term trend context
+    if sma200 and price > sma200:
+        trend += 1
+    elif sma200 and price < sma200:
+        trend -= 1
+
+    # ── TIMING SCORE (is NOW a good entry/exit point?) ──
+    timing = 0
+
+    # RSI — contrarian: oversold = good buy timing, overbought = good sell timing
+    if rsi is not None:
+        if rsi < get_rsi_os():
+            timing += 3      # Deeply oversold — strong buy timing
+        elif rsi < get_rsi_os() + 10:
+            timing += 2      # Approaching oversold (e.g. RSI 20-30) — good timing
+        elif rsi < 40:
+            timing += 1      # Getting cheap
+        elif rsi > get_rsi_ob():
+            timing -= 3      # Deeply overbought — strong sell timing
+        elif rsi > get_rsi_ob() - 10:
+            timing -= 2      # Approaching overbought (e.g. RSI 70-80) — bad timing
+        # NOTE: RSI 40 to (overbought-10) is NEUTRAL timing — no longer penalizes uptrends
+
+    # Stochastic — short-term overbought/oversold
     if stoch_k is not None and stoch_d is not None:
         if stoch_k < 20 and stoch_k > stoch_d:
-            score += 1
+            timing += 1      # Oversold bullish cross
         elif stoch_k > 80 and stoch_k < stoch_d:
-            score -= 1
+            timing -= 1      # Overbought bearish cross
 
-    # Breakout
+    # Bollinger %B — contrarian: near lower band = buy, near upper = sell
+    if bb_pct is not None:
+        if bb_pct < 15:
+            timing += 1      # Near lower band — potential bounce
+        elif bb_pct > 90:
+            timing -= 1      # Extended above upper band
+
+    # Volume spike — confirms timing only when directional
+    if vol_ratio >= 1.5:
+        if rsi is not None and rsi < 40:
+            timing += 1      # Volume on a dip = capitulation (bullish timing)
+        elif rsi is not None and rsi > get_rsi_ob():
+            timing -= 1      # Volume at top = blow-off (bearish timing)
+
+    # Breakout — special case: overrides normal timing
     if breakout_candidate:
-        score += 2
+        trend += 2
+        timing += 1
 
-    if score >= 5:
-        return "STRONG BUY"
-    elif score >= 2:
-        return "BUY"
-    elif score <= -5:
-        return "STRONG SELL"
-    elif score <= -2:
-        return "SELL"
+    # ── SIGNAL MATRIX ──
+    # Classify trend direction
+    if trend >= 3:
+        trend_dir = "STRONG_UP"
+    elif trend >= 1:
+        trend_dir = "UP"
+    elif trend <= -3:
+        trend_dir = "STRONG_DOWN"
+    elif trend <= -1:
+        trend_dir = "DOWN"
+    else:
+        trend_dir = "FLAT"
+
+    # Classify timing
+    if timing >= 2:
+        timing_dir = "GOOD"      # Oversold / good entry
+    elif timing <= -2:
+        timing_dir = "BAD"       # Overbought / take profit
+    else:
+        timing_dir = "NEUTRAL"
+
+    # ── DECISION MATRIX ──
+    # Strong uptrend
+    if trend_dir == "STRONG_UP":
+        if timing_dir == "GOOD":
+            return "STRONG BUY"
+        elif timing_dir == "BAD":
+            return "HOLD"        # Don't sell into a strong trend, just hold
+        else:
+            return "BUY"         # Strong trend + neutral timing = still a buy
+
+    # Mild uptrend
+    if trend_dir == "UP":
+        if timing_dir == "GOOD":
+            return "BUY"
+        elif timing_dir == "BAD":
+            return "SELL"        # Uptrend losing momentum + bad timing = take profit
+        else:
+            return "HOLD"
+
+    # Flat / no trend
+    if trend_dir == "FLAT":
+        if timing_dir == "GOOD":
+            return "BUY"         # No trend but oversold = speculative buy
+        elif timing_dir == "BAD":
+            return "SELL"        # No trend but overbought = sell
+        else:
+            return "HOLD"
+
+    # Mild downtrend
+    if trend_dir == "DOWN":
+        if timing_dir == "GOOD":
+            return "HOLD"        # Downtrend but oversold = wait for confirmation
+        elif timing_dir == "BAD":
+            return "STRONG SELL"
+        else:
+            return "SELL"
+
+    # Strong downtrend
+    if trend_dir == "STRONG_DOWN":
+        if timing_dir == "GOOD":
+            return "HOLD"        # Even oversold in a crash = don't catch falling knife
+        elif timing_dir == "BAD":
+            return "STRONG SELL"
+        else:
+            return "SELL"
+
     return "HOLD"
 
 
 def _calc_confidence(signal, rsi, macd_hist, vol_ratio, obv_trend,
                      cross, bb_pct, asym_score):
-    """Calculate confidence percentage for a signal."""
+    """Calculate confidence with PENALTIES for contradicting indicators.
+    A BUY signal with falling OBV should NOT show 80% confidence."""
     conf = 50
     if signal in ("STRONG BUY", "STRONG SELL"):
         conf = 80
     elif signal in ("BUY", "SELL"):
         conf = 65
 
-    # Adjustments
-    if rsi is not None:
-        if rsi < 25 or rsi > 75:
-            conf += 5
-    if macd_hist is not None and abs(macd_hist) > 2:
-        conf += 5
-    if vol_ratio >= 2.0:
-        conf += 5
-    if obv_trend in ("RISING", "FALLING"):
-        conf += 3
-    if cross in ("GOLDEN", "DEATH"):
-        conf += 10
-    if asym_score > 70 or asym_score < 30:
-        conf += 5
+    is_bullish = signal in ("BUY", "STRONG BUY")
+    is_bearish = signal in ("SELL", "STRONG SELL")
 
-    return min(100, max(0, conf))
+    # ── CONFIRMATIONS (boost confidence) ──
+    if rsi is not None:
+        if (is_bullish and rsi < 35) or (is_bearish and rsi > 70):
+            conf += 5  # RSI confirms direction
+
+    if macd_hist is not None and abs(macd_hist) > 2:
+        if (is_bullish and macd_hist > 0) or (is_bearish and macd_hist < 0):
+            conf += 5  # MACD confirms direction
+
+    if vol_ratio >= 2.0:
+        conf += 3  # High volume adds conviction either way
+
+    if cross in ("GOLDEN",) and is_bullish:
+        conf += 10
+    elif cross in ("DEATH",) and is_bearish:
+        conf += 10
+
+    if asym_score > 70 and is_bullish:
+        conf += 5  # Smart money confirms buy
+    elif asym_score < 30 and is_bearish:
+        conf += 5  # Smart money confirms sell
+
+    # ── CONTRADICTIONS (penalize confidence) ──
+    if is_bullish:
+        if obv_trend == "FALLING":
+            conf -= 10  # Buying but distribution happening
+        if cross in ("DEATH", "BEARISH"):
+            conf -= 15  # Buying into a downtrend
+        if rsi is not None and rsi > get_rsi_ob():
+            conf -= 10  # Buying at overbought levels
+        if macd_hist is not None and macd_hist < -2:
+            conf -= 8   # MACD strongly bearish
+        if asym_score < 35:
+            conf -= 5   # Smart money not buying
+
+    if is_bearish:
+        if obv_trend == "RISING":
+            conf -= 10  # Selling but accumulation happening
+        if cross in ("GOLDEN", "BULLISH"):
+            conf -= 15  # Selling into an uptrend
+        if rsi is not None and rsi < get_rsi_os():
+            conf -= 10  # Selling at oversold levels
+        if macd_hist is not None and macd_hist > 2:
+            conf -= 8   # MACD strongly bullish
+        if asym_score > 65:
+            conf -= 5   # Smart money accumulating
+
+    return min(100, max(10, conf))  # Floor at 10%, not 0%
 
 # ═══════════════════════════════════════════════════════════════════════
 #  FUNDAMENTAL ANALYSIS
@@ -1707,7 +1875,7 @@ def compute_composite_scores(all_analysis, fundamentals, sector_breadth, market_
         rsi_component = 0
         if a.get("rsi") is not None:
             # Map 20-80 range to 0-30
-            rsi_component = min(max((a["rsi"] - RSI_OVERSOLD) / (RSI_OVERBOUGHT - RSI_OVERSOLD), 0), 1) * 30
+            rsi_component = min(max((a["rsi"] - get_rsi_os()) / (get_rsi_ob() - get_rsi_os()), 0), 1) * 30
         macd_component = 0
         if a.get("macd_hist") is not None:
             macd_component = 15 if a["macd_hist"] > 0 else -15
@@ -1744,8 +1912,10 @@ def compute_composite_scores(all_analysis, fundamentals, sector_breadth, market_
         composite = (pa_score * 0.30 + mom_score * 0.25 + vol_score * 0.20
                      + sect_score * 0.15 + risk_score * 0.10)
 
-        # Apply market factor
-        composite *= market_regime.get("factor", 1.0)
+        # Apply market factor as bounded additive adjustment (not multiplicative)
+        # Max impact: ±5 points on a 0-100 scale instead of ±10% scaling
+        regime_adj = (market_regime.get("factor", 1.0) - 1.0) * 100
+        composite = composite + regime_adj
 
         # Seasonal
         composite += seasonality_bonus() + seasonality_penalty()
@@ -2075,7 +2245,9 @@ def run_full_analysis():
 
         # Market context
         regime = get_market_regime(conn)
-        print(f"  Market regime: {regime['regime']}  (factor {regime['factor']})")
+        set_dynamic_rsi(regime)
+        print(f"  Market regime: {regime['regime']}  (factor {regime['factor']}, trend {regime.get('trend', 0)})")
+        print(f"  Dynamic RSI thresholds: OB={get_rsi_ob()} / OS={get_rsi_os()}")
 
         s_bonus = seasonality_bonus()
         s_penalty = seasonality_penalty()

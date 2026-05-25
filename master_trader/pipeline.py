@@ -75,7 +75,8 @@ from swing_analyser.logic import (
     fetch_all_ohlcv,
     fetch_all_securities,
     fetch_broker_scores,
-    fetch_market_regime,
+    get_market_regime,
+    set_dynamic_rsi,
     forward_fill_zero_volume_days,
     get_adjusted_series,
     get_conn,
@@ -550,7 +551,8 @@ def _check_macd_bearish_crossover(macd_line: list[float]) -> bool:
 
 
 def _fetch_market_dashboard(conn: Any) -> dict[str, Any]:
-    regime = fetch_market_regime(conn)
+    regime = get_market_regime(conn)
+    set_dynamic_rsi(regime)
     summary = qone(conn, "SELECT * FROM market_summary ORDER BY trading_date DESC LIMIT 1")
     sub_indices = q(
         conn,

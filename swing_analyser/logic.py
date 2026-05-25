@@ -10,6 +10,26 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 import pymysql
+
+_DYNAMIC_RSI = {"ob": 80, "os": 20}
+
+def set_dynamic_rsi(regime_dict):
+    global _DYNAMIC_RSI
+    reg = regime_dict.get("regime", "NEUTRAL")
+    if reg == "STRONG_BULL":
+        _DYNAMIC_RSI["ob"] = 85
+        _DYNAMIC_RSI["os"] = 30
+    elif reg == "STRONG_BEAR":
+        _DYNAMIC_RSI["ob"] = 70
+        _DYNAMIC_RSI["os"] = 15
+    else:
+        _DYNAMIC_RSI["ob"] = 80
+        _DYNAMIC_RSI["os"] = 20
+
+def get_rsi_ob(): return _DYNAMIC_RSI["ob"]
+def get_rsi_os(): return _DYNAMIC_RSI["os"]
+
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -23,8 +43,8 @@ RISK_PCT       = 0.015
 ATR_SL_MULT    = 1.5              # Align risk doctrine with RR >= 2.0 baseline
 ATR_T1_MULT    = 3.0              # Target 1 = 3× risk
 ATR_T2_MULT    = 5.0              # Target 2 = 5× risk (swing sized)
-RSI_OVERBOUGHT = 80               # NEPSE-calibrated
-RSI_OVERSOLD   = 20
+RSI_OVERBOUGHT = 80  # Deprecated in favor of get_rsi_ob()               # NEPSE-calibrated
+RSI_OVERSOLD = 20    # Deprecated in favor of get_rsi_os()
 LOW_LIQ_THRESH = 5000
 CIRCUIT_LIMIT  = 0.10
 MIN_RR_RATIO   = 2.0
@@ -247,35 +267,41 @@ def fetch_broker_scores(conn):
         return {}
 
 
-def fetch_market_regime(conn):
+def get_market_regime(conn):
+    """Multi-day regime detection using 10-day trend of NEPSE index.
+    Prevents a single green/red day from flipping all signals."""
     try:
-        idx = qone(conn, "SELECT change_percent FROM market_indices WHERE index_name = 'NEPSE' ORDER BY date DESC LIMIT 1")
-        recent = q(conn, """
-            SELECT change_percent
+        rows = q(conn, """
+            SELECT change_percent, current_value
             FROM market_indices
             WHERE index_name = 'NEPSE'
-            ORDER BY date DESC
-            LIMIT 20
+            ORDER BY date DESC LIMIT 10
         """)
-        chg = float(idx.get("change_percent") or 0)
-        vals = [float(r.get("change_percent") or 0) for r in recent]
-        if len(vals) >= 5:
-            mean_chg = sum(vals) / len(vals)
-            var = sum((v - mean_chg) ** 2 for v in vals) / len(vals)
-            vol = var ** 0.5
-        else:
-            vol = 1.0
-        up_th = max(0.8, vol * 0.8)
-        down_th = -up_th
+        if not rows:
+            return {"regime": "NEUTRAL", "factor": 1.0, "chg": 0, "trend": 0}
 
-        if chg > up_th:
-            return {"regime": "BULLISH", "factor": 1.1, "chg": chg}
-        if chg < down_th:
-            return {"regime": "BEARISH", "factor": 0.9, "chg": chg}
-        return {"regime": "NEUTRAL", "factor": 1.0, "chg": chg}
+        today_chg = float(rows[0].get("change_percent") or 0)
+        closes = [float(r.get("current_value") or 0) for r in rows
+                  if float(r.get("current_value") or 0) > 0]
+
+        if len(closes) >= 5:
+            sma10 = sum(closes) / len(closes)
+            trend = (closes[0] - sma10) / sma10 * 100 if sma10 > 0 else 0
+        else:
+            trend = today_chg
+
+        if trend > 3.0:
+            return {"regime": "STRONG_BULL", "factor": 1.05, "chg": today_chg, "trend": round(trend, 2)}
+        if trend > 1.0:
+            return {"regime": "BULLISH",     "factor": 1.02, "chg": today_chg, "trend": round(trend, 2)}
+        if trend < -3.0:
+            return {"regime": "STRONG_BEAR", "factor": 0.95, "chg": today_chg, "trend": round(trend, 2)}
+        if trend < -1.0:
+            return {"regime": "BEARISH",     "factor": 0.98, "chg": today_chg, "trend": round(trend, 2)}
+        return {"regime": "NEUTRAL", "factor": 1.0, "chg": today_chg, "trend": round(trend, 2)}
     except Exception as e:
         print(f"  ⚠ Market regime query failed ({e}), defaulting to NEUTRAL")
-        return {"regime": "NEUTRAL", "factor": 1.0, "chg": 0}
+        return {"regime": "NEUTRAL", "factor": 1.0, "chg": 0, "trend": 0}
 
 
 def _is_fundamental_stale(fund_row, max_age_days=FUNDAMENTAL_STALE_DAYS):
@@ -1152,7 +1178,8 @@ def run_swing_analysis(top_n=15, min_avg_volume=5000, account_equity=None):
         all_live = fetch_all_live_ltp(conn)
         all_fund = fetch_all_fundamentals(conn)
         broker_scores = fetch_broker_scores(conn)
-        regime = fetch_market_regime(conn)
+        regime = get_market_regime(conn)
+        set_dynamic_rsi(regime)
         total_universe = len(all_ohlcv)
 
         print(f"  Market regime: {regime['regime']} (NEPSE {regime['chg']:+.2f}%)")
